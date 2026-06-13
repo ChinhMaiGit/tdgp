@@ -13,22 +13,19 @@ M1-M6) on the Chicago Energy Benchmarking dataset.
 ## What is present
 
 This bundle contains the **compiled draft** (`tex/`), the **flat-staged
-figures** embedded in that draft (`figures/`), the **analysis scripts** that
+figures** embedded in that draft (`tex/figures/`), the **analysis scripts** that
 produced them (`scripts/`), human-readable result/description summaries
 (`results/docs/`), and an experiments checkpoint carrying the six-model
 cross-validation numbers and LaTeX comparison table (`results/experiments/`).
 
 ```
-tex/
+tex/                  self-contained, arXiv-uploadable bundle
   main.tex            entry point (\input sections/*.tex)
-  main.pdf            compiled draft
+  main.pdf            compiled draft (rebuilt by arXiv from source; not uploaded)
   sections/           00_abstract.tex, 01_introduction.tex,
                       02_section.tex … 08_section.tex, references.tex
-figures/              24 figures (PNG) referenced by the draft (flat, by basename)
+  figures/            24 figures (PNG) referenced by the draft (flat, by basename)
 scripts/              generators, grouped by source folder
-  generate_figure_2b3d.py       2x3 six-model publication figures + LaTeX table
-  render_draft.py                Markdown-to-LaTeX build tool
-  xgb_standard_pipeline.py      standard ML benchmark + SHAP mediator attribution
   data/                         eda_dataset.py, shadow_matrix_values.py,
                                 candidate_dag.py
   experiments/                  experiment.py, models.py, pipeline.py, reporting.py
@@ -56,16 +53,42 @@ results/                script outputs are routed here, grouped by source
   captured in this snapshot. Their directories exist as scaffolding but are
   empty. Run the relevant generators to populate them.
 - **NetCDF posterior traces** (`m3_trace.nc`, `m6_trace.nc`) are excluded by
-  design (~8.3 GB combined). Regenerate by running `scripts/experiments/models.py`
-  (full MCMC), which writes both to `results/inference/`.
-- **The `drafts/` source tree.** `render_draft.py` reads Markdown sources from
-  `drafts/final/` and writes to `drafts/render/` — neither directory exists
-  here. The LaTeX and PDF under `tex/` represent the frozen render output.
+  design (~8.3 GB combined). Regenerate by running
+  `scripts/experiments/experiment.py` (full MCMC), which writes both to
+  `results/inference/` as a side effect of fitting M3 and M6.
+- **Three scripts referenced by earlier snapshots** —
+  `generate_figure_2b3d.py`, `render_draft.py`, and `xgb_standard_pipeline.py` —
+  are no longer part of this tree. The six-model figures and comparison table
+  are produced by `experiments/experiment.py` (and regenerated standalone from
+  `results.pkl` by `experiments/reporting.py`); the LaTeX/PDF render that
+  `render_draft.py` used to produce is already frozen under `tex/`.
 - **Dependency specification.** No `pyproject.toml` or `uv.lock` is included.
-  Required packages: `numpy`, `pandas`, `polars`, `matplotlib`, `requests`,
-  `xgboost`, `optuna`, `scikit-learn`, `pymc`, `arviz`.
+  Required packages: `numpy`, `scipy`, `pandas`, `polars`, `matplotlib`,
+  `requests`, `xgboost`, `optuna`, `scikit-learn`, `shap`, `pymc`, `arviz`
+  (tested on Python 3.14).
+
+## Posting to arXiv
+
+The `tex/` directory is a self-contained submission bundle. Upload its contents
+(`main.tex`, `sections/`, and `figures/`); arXiv recompiles from source, so the
+`\includegraphics{figures/...}` paths resolve relative to `main.tex` with no
+`../` escaping the upload root. References are typeset from `sections/references.tex`
+via `\input` (no BibTeX), so no `.bbl` is required. Do not include `main.pdf` in
+the upload — arXiv builds its own. Note that a first submission to `stat.ME` or
+`econ.EM` may require endorsement, and a license must be chosen at submission.
 
 ## Regenerating results
+
+See **[`REPLICATION.md`](REPLICATION.md)** for the full step-by-step run order,
+the figure-to-script map, and the minimal end-to-end command sequence. In brief:
+
+1. `scripts/experiments/experiment.py` is the main entry point — it fits all six
+   models, writes `results/experiments/results.pkl`, the comparison table, the
+   summary figures, and the two MCMC traces under `results/inference/`.
+2. The inference, counterfactual, sensitivity, and M3 diagnostic scripts consume
+   those traces, so run the experiment first.
+3. The EDA, DAG, mediator, and M2-SHAP scripts are standalone (they re-fetch the
+   data) and can run in any order.
 
 Scripts under `scripts/` write outputs into `results/<source>/` using paths
 anchored to `__file__`, so they can be run from any working directory.
@@ -75,5 +98,5 @@ Shared-module imports (`from pipeline import ...`) resolve from
 Running a full analysis also requires a live network connection for the
 Chicago Socrata data fetch.
 
-Stdout-only scripts (`data/shadow_matrix_values.py`, `mediator/*.py`,
-`xgb_standard_pipeline.py`) print to the console and do not write files.
+Stdout-only scripts (`data/shadow_matrix_values.py`, `mediator/*.py`) print to
+the console and do not write files.
