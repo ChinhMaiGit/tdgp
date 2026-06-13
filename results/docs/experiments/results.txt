@@ -1,0 +1,396 @@
+PS D:\projects\1stArxivPaper> uv run python experiments/scripts/experiment.py
+  Random seeds set: Python random=20, NumPy=20
+  Model-level seeds: XGBoost random_state=20, PyMC chains=[20,21,22,23]
+
+======================================================================
+FETCHING DATA
+======================================================================
+Fetching Chicago Energy Benchmarking data ...
+  50,000 records ...
+  Total records: 28,329
+
+======================================================================
+STEP 1 -- PREPROCESSING
+======================================================================
+Building compliance flag ...
+Imputing upstream features (shared, global median) ...
+
+  Causally-blind row set   : 21,714 rows (all rows with observed target)
+Filling CB features with column medians (naive analyst default) ...
+  Causal row set           : 21,406 rows (compliant + observed target)
+
+  Row count difference     : 308 rows — naive analyst uses more data and still gets the wrong answer.
+Applying structural zeros for causal pipeline (verified DAG) ...
+Fitting propensity model on full dataset ...
+  Propensity model accuracy : 0.951
+  IPW 99th-pct cap     : 1.382
+  IPW max (normalised) : 1.322
+
+  Non-compliant (deployment test) : 5,510 rows
+
+  Alignment verified:
+    CB pipeline    : 21,714 rows (target, log-target, bids)
+    Causal pipeline: 21,406 rows (target, log-target, bids, IPW)
+
+======================================================================
+STEP 2 -- M1  Causally-Blind OLS
+  Features : CB_ALL_FEATURES (upstream + spatial + compliance +
+             mediators + derived metrics + water use)
+  Rows     : 21,714 (all rows with observed target)
+  CV       : KFold — no building ID grouping
+  IPW      : none
+======================================================================
+
+-- M1 CB OLS --
+  Fold 1: R2=0.7421  MdAPE=30.15%  RMSE=1,992,137
+  Fold 2: R2=0.7737  MdAPE=32.32%  RMSE=17,381
+  Fold 3: R2=0.7766  MdAPE=32.50%  RMSE=174,020
+  Fold 4: R2=0.7298  MdAPE=30.64%  RMSE=83,800,338
+  Fold 5: R2=0.7591  MdAPE=31.90%  RMSE=145,090
+
+======================================================================
+STEP 3 -- M2  Causally-Blind XGB
+  Features : CB_ALL_FEATURES (includes ghg_intensity, EUIs, etc.)
+  Rows     : 21,714 (all rows with observed target)
+  CV       : KFold tuned — no building ID grouping
+  IPW      : none
+  Expected : R2 -> 1.0, MdAPE -> 0% (ghg_intensity ~ target / area)
+======================================================================
+
+-- M2 CB XGB --
+  Fold 1 inner MdAPE=2.28%  best_lr=0.0166  best_depth=7
+         outer: R2=0.9929  MdAPE=2.12%  RMSE=3,353  [51s]
+  Fold 2 inner MdAPE=1.81%  best_lr=0.0259  best_depth=5
+         outer: R2=0.9889  MdAPE=1.63%  RMSE=1,030  [52s]
+  Fold 3 inner MdAPE=2.45%  best_lr=0.0264  best_depth=9
+         outer: R2=0.9962  MdAPE=2.34%  RMSE=1,001  [50s]
+  Fold 4 inner MdAPE=2.33%  best_lr=0.0199  best_depth=10
+         outer: R2=0.9962  MdAPE=2.24%  RMSE=1,185  [64s]
+  Fold 5 inner MdAPE=2.59%  best_lr=0.0175  best_depth=7
+         outer: R2=0.9902  MdAPE=2.39%  RMSE=1,498  [59s]
+
+======================================================================
+STEP 4 -- M3  Causally-Blind Bayes
+  Features : CB_ALL_FEATURES passed; model uses upstream structural
+             features + mediator slopes (parametric structure does
+             not accommodate all of CB_ALL_FEATURES explicitly)
+  Rows     : 21,714 (all rows with observed target)
+  CV       : PSIS-LOO
+  IPW      : none
+  Expected : mediator slopes converge toward EPA emission factors
+======================================================================
+
+-- M3 CB Bayes --
+  n_obs         : 21,714
+  feature_cols  : ['year_built', 'of_buildings', 'data_year', 'gross_floor_area_buildings_sq_ft', 'primary_property_type', 'zip_code', 'community_area', 'latitude', 'longitude', 'reporting_status', 'exempt_from_chicago_energy_rating', 'electricity_use_kbtu', 'natural_gas_use_kbtu', 'district_steam_use_kbtu', 'district_chilled_water_use_kbtu', 'all_other_fuel_use_kbtu', 'site_eui_kbtu_sq_ft', 'source_eui_kbtu_sq_ft', 'weather_normalized_site_eui_kbtu_sq_ft', 'weather_normalized_source_eui_kbtu_sq_ft', 'ghg_intensity_kg_co2e_sq_ft', 'energy_star_score', 'chicago_energy_rating', 'water_use_kgal']
+  IPW           : no
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 4 jobs)
+NUTS: [alpha_bar, sigma_alpha, alpha_offset, beta_A, beta_B, beta_T, beta_Y, sigma, beta_electricity_use_kbtu, beta_natural_gas_use_kbtu, beta_district_steam_use_kbtu, beta_district_chilled_water_use_kbtu, beta_all_other_fuel_use_kbtu]
+
+                                                              Grad
+  Progress                Draw        Divergen…   Step size   evals       Speed                  Elapsed     Remaining
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.033       127         26.93 draws/s          0:03:42     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.041       127         25.89 draws/s          0:03:51     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.026       127         26.08 draws/s          0:03:50     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.034       127         26.18 draws/s          0:03:49     0:00:00
+
+Sampling 4 chains for 3_000 tune and 3_000 draw iterations (12_000 + 12_000 draws total) took 242 seconds.
+Sampling: [y_hat]
+  R-hat max=1.0035  ESS min=548  divergences=0  Pareto-k>0.7: 5
+
+======================================================================
+STEP 5 -- M4  Causal OLS
+  Features : upstream only (structural zeros, verified DAG)
+  Rows     : 21,406 (compliant rows only)
+  CV       : GroupKFold on building ID
+  IPW      : back-door adjustment (WLS)
+======================================================================
+
+-- M4 Causal OLS --
+  Fold 1: R2=0.6077  MdAPE=39.35%  RMSE=133,339
+  Fold 2: R2=0.6069  MdAPE=38.65%  RMSE=129,691
+  Fold 3: R2=0.6029  MdAPE=40.01%  RMSE=3,662
+  Fold 4: R2=0.3107  MdAPE=39.35%  RMSE=271,359,663
+  Fold 5: R2=0.6561  MdAPE=40.33%  RMSE=13,188
+
+======================================================================
+STEP 6 -- M5  Causal XGB  <- causal ceiling
+  Features : upstream only (structural zeros, verified DAG)
+  Rows     : 21,406 (compliant rows only)
+  CV       : GroupKFold tuned on building ID
+  IPW      : back-door adjustment (sample weights)
+======================================================================
+
+-- M5 Causal XGB --
+  Fold 1 inner MdAPE=21.10%  best_lr=0.0195  best_depth=5
+         outer: R2=0.8310  MdAPE=19.84%  RMSE=2,584  [34s]
+  Fold 2 inner MdAPE=21.50%  best_lr=0.0535  best_depth=5
+         outer: R2=0.8248  MdAPE=21.47%  RMSE=4,276  [27s]
+  Fold 3 inner MdAPE=20.80%  best_lr=0.0188  best_depth=5
+         outer: R2=0.8253  MdAPE=21.49%  RMSE=1,934  [34s]
+  Fold 4 inner MdAPE=21.06%  best_lr=0.0143  best_depth=5
+         outer: R2=0.8489  MdAPE=19.62%  RMSE=5,996  [35s]
+  Fold 5 inner MdAPE=20.56%  best_lr=0.0131  best_depth=5
+         outer: R2=0.8435  MdAPE=22.60%  RMSE=2,007  [31s]
+
+======================================================================
+STEP 7 -- M6  Causal Bayes  <- structural model
+  Features : upstream only (structural zeros, verified DAG)
+  Rows     : 21,406 (compliant rows only)
+  CV       : PSIS-LOO
+  IPW      : back-door adjustment via pm.Potential
+======================================================================
+
+-- M6 Causal Bayes --
+  n_obs         : 21,406
+  feature_cols  : ['year_built', 'of_buildings', 'data_year', 'gross_floor_area_buildings_sq_ft', 'primary_property_type']
+  IPW           : yes
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 4 jobs)
+NUTS: [alpha_bar, sigma_alpha, alpha_offset, beta_A, beta_B, beta_T, beta_Y, sigma]
+
+                                                              Grad
+  Progress                Draw        Divergen…   Step size   evals       Speed                  Elapsed     Remaining
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.031       127         36.23 draws/s          0:02:45     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.032       127         35.95 draws/s          0:02:46     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.054       127         35.26 draws/s          0:02:50     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.046       127         36.44 draws/s          0:02:44     0:00:00
+
+Sampling 4 chains for 3_000 tune and 3_000 draw iterations (12_000 + 12_000 draws total) took 181 seconds.
+Sampling: [y_hat]
+  R-hat max=1.0095  ESS min=526  divergences=0  Pareto-k>0.7: 1
+  M6 trace saved -> D:\projects\1stArxivPaper\inference\m6_trace.nc
+  M3 trace saved -> D:\projects\1stArxivPaper\inference\m3_trace.nc
+
+======================================================================
+STEP 8 -- DEPLOYMENT TEST (all 6 models)
+  CB models    : non-compliant buildings receive CB median
+                 imputation for all features (mirrors training).
+  Causal models: non-compliant buildings receive structural zeros
+                 for mediators (verified DAG).
+  Causal models expected to be stable (~850-1,100 metric tons).
+======================================================================
+
+-- Deployment test: non-compliant buildings --
+  Non-compliant buildings : 5,510
+  Log-scale predictions clipped to [-20.0, 15.0] before exponentiation
+  M1 CB OLS                 median=       486  mean=     2,640  metric tons CO2e
+  M2 CB XGB                 median=       641  mean=       968  metric tons CO2e
+  M4 Causal OLS             median=       854  mean=     3,865  metric tons CO2e
+  M5 Causal XGB             median=     1,213  mean=     1,701  metric tons CO2e
+  M3 CB Bayes               computing posterior predictive ...
+  Building deployment predictive for 5,510 buildings ...
+Sampling: [y_hat]
+  M3 CB Bayes               median=     1,025  mean=     1,184  metric tons CO2e
+  M6 Causal Bayes           computing posterior predictive ...
+  Building deployment predictive for 5,510 buildings ...
+Sampling: [y_hat]
+  M6 Causal Bayes           median=     1,043  mean=     1,323  metric tons CO2e
+
+-- Row-alignment check --
+  CB pipeline    (21,714 rows)
+    M1 CB OLS                 21,714 rows  [OK]
+    M2 CB XGB                 21,714 rows  [OK]
+    M3 CB Bayes               21,714 rows  [OK]
+  Causal pipeline (21,406 rows)
+    M4 Causal OLS             21,406 rows  [OK]
+    M5 Causal XGB             21,406 rows  [OK]
+    M6 Causal Bayes           21,406 rows  [OK]
+
+======================================================================
+VALIDATING CONTEXT
+======================================================================
+  ctx validation passed — all required keys present
+
+======================================================================
+SAVING RESULTS
+======================================================================
+  Saved -> results.pkl
+
+======================================================================
+COMPARISON TABLES
+======================================================================
+
+===========================================================================================
+                          2x3 FACTORIAL COMPARISON  (out-of-sample)
+===========================================================================================
+
+  -- CAUSALLY-BLIND PIPELINE (no IPW | ALL features | KFold) --
+  Model                       R2(log)      MdAPE %     Med RMSE      89% cov         ELPD
+  -------------------------------------------------------------------------------------------
+  M1 CB OLS                   +0.7563        31.50%      174,020         93.8%       -17075
+  M2 CB XGB                   +0.9929         2.14%        1,185         96.7%       +22317
+  M3 CB Bayes *               +0.8480        20.94%          213         92.4%       -11937
+
+  -- CAUSAL PIPELINE (IPW | upstream features | GroupKFold) --
+  Model                       R2(log)      MdAPE %     Med RMSE      89% cov         ELPD
+  -------------------------------------------------------------------------------------------
+  M4 Causal OLS               +0.5569        39.54%      129,691         93.1%       -22716
+  M5 Causal XGB               +0.8347        21.00%        2,584         92.4%       -12491
+  M6 Causal Bayes *           +0.8380        21.36%          218         92.8%       -12316
+  -------------------------------------------------------------------------------------------
+
+  -- IPW EFFECT: causal minus causally-blind (same approach) --
+  Approach                   Delta R2  Delta MdAPE   Delta RMSE    Delta cov   Delta ELPD
+  -------------------------------------------------------------------------------------------
+  Frequentist                 -0.1994        +8.04%      -44,328         -0.6%        -5641
+  ML                          -0.1582       +18.86%       +1,399         -4.3%       -34809
+  Bayesian                    -0.0099        +0.42%           +5         +0.4%         -378
+  -------------------------------------------------------------------------------------------
+
+  Notes
+  ------------------------------------------------------------
+  Causally-blind pipeline: ~21,714 rows (all observed target), ALL features, KFold, no IPW.
+  Causal pipeline: ~21,406 rows (compliant only), upstream only, GroupKFold, IPW.
+  * Bayesian RMSE from PSIS-LOO predictive means — not comparable
+    to fold-median RMSE of OLS/XGBoost.
+  ELPD  : Normal-approx CV (M1,M2,M4,M5); PSIS-LOO (M3,M6).
+  Delta MdAPE: positive = causal has HIGHER error.
+    ML (+18.9 pp): EXPECTED — CB exploits post-treatment mediators + circular
+                  derived features in CB_ALL_FEATURES, both unavailable at deployment.
+
+
+=================================================================
+  LATEX TABLE
+=================================================================
+\begin{table}[ht]
+\centering
+\setlength{\tabcolsep}{6pt}
+\small
+\caption{Out-of-sample performance for the 2$\times$3 factorial design (realistic comparison). Causally-blind pipeline: $\sim$21{,}714 rows (all observed target), ALL features (including derived metrics), KFold(5), no IPW. Causal pipeline: $\sim$21{,}406 rows (compliant only), upstream features only, GroupKFold(5) on building ID, IPW back-door adjustment. The large positive $\Delta$MdAPE for ML is \emph{expected}: the causally-blind XGBoost exploits post-treatment mediators (e.g.\ \texttt{electricity\_use\_kbtu}) and circular derived metrics (e.g.\ \texttt{ghg\_intensity\_kg\_co2e\_sq\_ft}) in \texttt{CB\_ALL\_FEATURES}, both groups unavailable or invalid at deployment. ELPD: Normal-approximation CV for OLS and XGBoost; PSIS-LOO for Hierarchical Bayes. $^{\ddagger}$~Bayesian RMSE from PSIS-LOO predictive means; not comparable to fold-median RMSE.}
+\label{tab:model_comparison}
+\begin{tabular}{llccccc}
+\toprule
+Pipeline & Approach & $R^2(\log)$ & MdAPE & Med.\ RMSE$^{\ddagger}$ & 89\% PI cov. & ELPD \\
+\midrule
+\multicolumn{7}{l}{\textit{Panel A: Causally-blind pipeline (no IPW, ALL features, KFold)}} \\
+\midrule
+& OLS & +0.756 & 31.5\% & 174,020 & 93.8\% & -17,075 \\
+& XGBoost & +0.993 & 2.1\% & 1,185 & 96.7\% & 22,317 \\
+& Hier. Bayes$^{\dagger}$ & +0.848 & 20.9\% & 213 & 92.4\% & -11,937 \\
+\midrule
+\multicolumn{7}{l}{\textit{Panel B: Causal pipeline (IPW, upstream features, GroupKFold)}} \\
+\midrule
+& OLS & +0.557 & 39.5\% & 129,691 & 93.1\% & -22,716 \\
+& XGBoost & +0.835 & 21.0\% & 2,584 & 92.4\% & -12,491 \\
+& Hier. Bayes$^{\dagger}$ & +0.838 & 21.4\% & 218 & 92.8\% & -12,316 \\
+\midrule
+\multicolumn{7}{l}{\textit{Panel C: IPW effect (causal $-$ causally-blind; positive $\Delta$MdAPE = causal has higher error)}} \\
+\midrule
+& Frequentist & -0.199 & 8.0\% & -44,328 & -0.6\% & -5,641 \\
+& ML & -0.158 & 18.9\% & 1,399 & -4.3\% & -34,809 \\
+& Bayesian & -0.010 & 0.4\% & 5 & 0.4\% & -378 \\
+\bottomrule
+\multicolumn{7}{l}{\footnotesize $^{\dagger}$~PSIS-LOO; fold variance not applicable. $^{\ddagger}$~Bayesian RMSE from LOO predictive means.} \\
+\end{tabular}
+\end{table}
+
+  Saved -> table_comparison.tex
+
+======================================================================
+GENERATING FIGURES
+======================================================================
+  Saved -> fig_comparison.png
+  Saved -> fig_quintile.png
+  Saved -> fig_deployment.png
+  Saved -> fig_pred_vs_actual.png
+
+======================================================================
+EXPERIMENT COMPLETE
+======================================================================
+  Total runtime : 16m 50s
+  Random seed   : 20 (Python, NumPy, XGBoost, PyMC, Optuna)
+
+  Output files
+  ──────────────────────────────────────────────────
+  results.pkl                         [OK]    30761 KB
+  table_comparison.tex                [OK]        2 KB
+  fig_comparison.png                  [OK]      150 KB
+  fig_quintile.png                    [OK]       78 KB
+  fig_deployment.png                  [OK]      129 KB
+  fig_pred_vs_actual.png              [OK]      159 KB
+
+  Model performance summary (out-of-sample)
+  ──────────────────────────────────────────────────────────
+  Model                       R2(log)    MdAPE       ELPD
+  ──────────────────────────────────────────────────────────
+  M1 CB OLS                   +0.7563   31.50%     -17075
+  M2 CB XGB                   +0.9929    2.14%     +22317
+  M3 CB Bayes                 +0.8480   20.94%     -11937
+  ──────────────────────────────────────────────────────────
+  M4 Causal OLS               +0.5569   39.54%     -22716
+  M5 Causal XGB               +0.8347   21.00%     -12491
+  M6 Causal Bayes             +0.8380   21.36%     -12316
+
+  IPW effect (causal minus causally-blind, same approach)
+  ──────────────────────────────────────────────────────────
+  Approach               Delta R2   Delta MdAPE
+  ──────────────────────────────────────────────────────────
+  Frequentist             -0.1994        +8.04%
+  ML                      -0.1582       +18.86%
+  Bayesian                -0.0099        +0.42%
+
+  Deployment test summary (non-compliant buildings)
+  Log-scale predictions clipped to [-20, 15] before exponentiation
+  Median = primary statistic  |  Mean may be inflated by OLS extrapolation outliers
+  ────────────────────────────────────────────────────────────────────
+  Model                     Pipeline         Median (t CO2e)  Mean (t CO2e)
+  ────────────────────────────────────────────────────────────────────
+  M1 CB OLS                 causally-blind               486          2,640
+  M2 CB XGB                 causally-blind               641            968
+  M3 CB Bayes               causally-blind             1,025          1,184
+  ────────────────────────────────────────────────────────────────────
+  M4 Causal OLS             causal                       854          3,865
+  M5 Causal XGB             causal                     1,213          1,701
+  M6 Causal Bayes           causal                     1,043          1,323
+
+  Mean annotation key
+  ────────────────────────────────────────
+  (!)  : mean > 1M metric tons — OLS extrapolation artefact.
+  *    : mean > 100K metric tons — moderate extrapolation effect.
+  Median is always the correct summary for skewed distributions.
+
+  Interpretation
+  ──────────────────────────────────────────────────────────
+  CB miscalibration (M2 CB XGB):
+    With ghg_intensity and other derived metrics imputed to
+    training medians, M2 predicts roughly (median_ghg_intensity ×
+    floor_area) for each non-compliant building. This is still
+    causally invalid and produces systematically wrong totals
+    because the imputed intensity does not reflect the actual
+    (unknown) energy behaviour of non-compliant buildings.
+    No longer near-zero, but still useless for deployment.
+
+  CB partial shift (M1 CB OLS, M3 CB Bayes):
+    M1/M3 receive the same median-imputed derived features.
+    OLS extrapolation can still inflate the mean for extreme
+    upstream combinations. M3 shows apparent stability because
+    standardised mediator values are moderate, but the model
+    is not reasoning causally — it is simply using the best
+    available (but circular) features.
+
+  Causal stability (M4, M5, M6, median ~850–1,100 tons):
+    Consistent with the observed compliant building median of
+    ~1,018 metric tons. The causal pipeline is deployable on
+    the full city building stock because it never relied on
+    post-treatment or circular features.
+
+  Row-count note
+  ──────────────────────────────────────────────────────────
+  The causally-blind pipeline trained on ~21,714 rows while the
+  causal pipeline used ~21,406 rows. The naïve analyst used more
+  data and still produced the wrong model — a key part of the
+  demonstration.
+
+  Reproducibility
+  ──────────────────────────────────────────────────────────
+  All results seeded with SEED=20.
+  Exact numerical reproducibility holds on the same machine
+  and software versions. Minor floating-point differences may
+  appear across different OS, CPU architecture, or library
+  versions due to non-associative floating-point arithmetic.
+  Package versions are pinned in uv.lock for full environment
+  reproducibility.

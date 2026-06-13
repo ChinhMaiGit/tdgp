@@ -1,0 +1,119 @@
+# Results
+
+Section 3 established what each model is permitted to know and how it is evaluated. We now report what the models actually learned, whether the pre-registered predictions held, and what the deployment test reveals about the practical consequences of the pipeline choice.
+
+
+## 4.1 Cross-Validation Performance
+
+Table 1 reports out-of-sample R²(log), MdAPE, median RMSE, 89% predictive interval coverage, and ELPD for all six models. We discuss each result in the order the predictions were stated.
+
+**Table 1 — Out-of-sample performance, 2×3 factorial design.** Causally-blind pipeline: ~21,714 rows (all observed target), ALL features (including derived metrics), KFold(5), no IPW. Causal pipeline: ~21,406 rows (compliant only), upstream features only, GroupKFold(5) on building ID, IPW back-door adjustment. The large positive ΔMdAPE for ML is *expected*: the causally-blind XGBoost exploits post-treatment mediators (e.g. `electricity_use_kbtu`) and circular derived metrics (e.g. `ghg_intensity_kg_co2e_sq_ft`). ELPD: Normal-approximation CV for OLS and XGBoost; PSIS-LOO for Hierarchical Bayes. †Bayesian RMSE from PSIS-LOO predictive means; not comparable to fold-median RMSE.
+
+| Pipeline | Approach | R²(log) | MdAPE | Med. RMSE† | 89% PI cov. | ELPD |
+|---|---|---|---|---|---|---|
+| **Causally-blind** | OLS | +0.756 | 31.5% | 174,020 | 93.8% | −17,075 |
+| | XGBoost | +0.993 | 2.1% | 1,185 | 96.7% | +22,317 |
+| | Hier. Bayes | +0.848 | 20.9% | 213 | 92.4% | −11,935 |
+| **Causal** | OLS | +0.557 | 39.5% | 129,691 | 93.1% | −22,716 |
+| | XGBoost | +0.835 | 21.0% | 2,584 | 92.4% | −12,491 |
+| | Hier. Bayes | +0.838 | 21.4% | 218 | 92.8% | −12,316 |
+| **IPW effect** | Frequentist | −0.199 | +8.0 pp | −44,328 | −0.6 pp | −5,641 |
+| *(causal − CB)* | ML | −0.158 | +18.9 pp | +1,399 | −4.3 pp | −34,809 |
+| | Bayesian | −0.010 | +0.4 pp | +5 | +0.4 pp | −381 |
+
+
+### 4.1.1 M2 CB XGB: Near-Identity Exploitation — P1 Corroborated
+
+**Finding 1 — M2 CB XGB achieves fictitiously perfect CV performance.** M2 records R² = 0.993 and MdAPE = 2.1% across five KFold splits, with fold-level R² ranging from 0.989 to 0.996 — a remarkably tight band. The data do not falsify P1: the near-identity conjecture survives this test. The result is not a demonstration of predictive power; it is the empirical signature of tautological and post-treatment feature exploitation. The fold RMSE values — 3,353 in fold 1, 1,030 in fold 2, 1,001 in fold 3 — are inconsistent with genuine model learning; they reflect how much residual noise remains after the near-identity is recovered, not how well the model generalises. The ELPD of +22,317 is 34,808 units above M5 Causal XGB (−12,491), a gap so large it signals model misspecification, not superiority.
+
+For a quantified breakdown of which feature groups drive M2's performance, see the post-hoc SHAP attribution in `diagnostic/m2_shap.py`.
+
+
+### 4.1.2 M5 Causal XGB: The Honest Performance Ceiling — P2 Corroborated
+
+**Finding 2 — M5 Causal XGB defines the maximum achievable performance on causally legitimate predictors.** M5 records R² = 0.835 and MdAPE = 21.0% on five GroupKFold splits. Fold-level R² is stable, ranging from 0.825 to 0.849 — a tight band that reflects genuine generalisation rather than within-building interpolation. P2 survives: MdAPE falls at the lower end of the predicted [20, 25]% range, and the data offer no basis for its refutation. The consistent depth-5 tree choice across all inner tuning loops is noteworthy: given only five upstream features, the optimal tree depth is shallow, and deeper trees overfit without adding signal. The 14.9 percentage-point gap in R² between M2 and M5 — 0.993 versus 0.835 — measures how much of M2's apparent performance is fictitious.
+
+
+### 4.1.3 M4 Causal OLS: Linear Form Failure — P3 Partially Falsified
+
+**Finding 3 — M4 Causal OLS is the weakest model overall, and its fold-level variance exposes OLS extrapolation.** M4 records R² = 0.557 and MdAPE = 39.5%. The directional conjecture in P3 survives: OLS is substantially weaker than XGBoost, as predicted, and the MdAPE is the highest of all six models. More diagnostic than the averages is the within-model variance: fold 4 produces R² = 0.311, against 0.603–0.656 for the other four folds. GroupKFold placed a building cluster in fold 4's test set whose GHG–floor area relationship OLS cannot linearly represent. The fold-median RMSE of 129,691 metric tons — against M5's 2,584 — establishes that OLS is not merely noisier than XGBoost; it encounters qualitatively different failure modes when buildings cluster by size or type in ways the linear form cannot accommodate.
+
+P3 is *partially falsified*. We conjectured R² ∈ [0.40, 0.60]; the fold mean (0.557) survives at the lower boundary of that range, but fold 4's R² = 0.311 falls outside it and falsifies the predicted floor. The central tendency conjecture survives; the tail conjecture does not. Fold 4's extreme RMSE of 271,359,663 metric tons reflects a small number of very large buildings whose OLS prediction extrapolates to physically impossible values — a region the conjecture did not anticipate. The median RMSE (129,691 metric tons) is the more honest summary.
+
+
+### 4.1.4 M3 CB Bayes: Apparent Parity, Wrong Reason — P4 Corroborated
+
+**Finding 4 — M3 CB Bayes performs similarly to the causal models in CV, but the similarity is structural, not causal.** M3 records R² = 0.848 and MdAPE = 20.9% — nearly identical to M5 (0.835, 21.0%) and M6 (0.838, 21.4%). P4 survives: the data are inconsistent with the conjecture's negation, which would have required M3 to achieve near-perfect CV performance through exploitation of derived metrics. The mechanism is exactly as anticipated: M3's parametric generative model assigns explicit slope parameters only to upstream features and mediators; the derived metrics, spatial columns, and compliance metadata present in `CB_ALL_FEATURES` do not enter the likelihood. The Normal(0, 2.0) mediator priors allow the fuel slopes to approach the EPA emission factors, giving M3 predictive performance structurally similar to the causal models. However, M3 trains without IPW, uses KFold rather than GroupKFold, and trains on 21,714 rows that include non-compliant buildings whose inclusion is not causally justified. The parity in CV metrics is a coincidence of parameterisation, not evidence of causal validity. Section 4.3 probes this distinction directly.
+
+MCMC diagnostics indicate reliable sampling: R̂_max = 1.008, ESS_min = 616, zero divergent transitions, and only 5 observations with Pareto-k > 0.7 across 21,714 data points — all well within acceptable bounds.
+
+
+### 4.1.5 M6 Causal Bayes: Structural Model — P5 Corroborated
+
+**Finding 5 — M6 Causal Bayes matches M5 Causal XGB within 0.4 percentage points on MdAPE, leaving the performance-ceiling conjecture standing.** M6 records R² = 0.838 and MdAPE = 21.4%. P5 survives: the ML estimator holds no special advantage over hierarchical Bayes when both work from the same five upstream features. With five upstream predictors, the modelling complexity is low enough that hierarchical partial pooling and XGBoost's nonlinear approximation converge to the same performance level. The ELPD advantage of M6 over M5 (−12,316 versus −12,491, a difference of 175 units) is small but in the predicted direction: partial pooling over 63 property types gives M6 a marginal edge for property types with few observations, where pooling toward the global mean outperforms fold-by-fold XGBoost fitting. Neither difference is material for practical purposes; what matters is that both models produce consistent, interpretable predictions from causally legitimate inputs.
+
+MCMC diagnostics for M6: R̂_max = 1.010, ESS_min = 526, zero divergent transitions, one observation with Pareto-k > 0.7. The slightly elevated R̂ and lower ESS relative to M3 reflect the additional complexity of the IPW potential in the log-posterior; both values remain within acceptable bounds.
+
+
+## 4.2 The IPW Correction Effect — P6 Corroborated
+
+ΔMdAPE = MdAPE_causal − MdAPE_CB for each approach pair is positive in all three cases. P6 survives: the data are inconsistent with a world in which the causal pipeline's CV error is lower than or equal to its causally-blind counterpart. The causal pipeline has *higher* apparent error in cross-validation — this is the correct and expected outcome. Higher CB CV performance reflects circular feature exploitation, not better generalisation.
+
+**ML pair (M5 vs M2): ΔMdAPE = +18.9 pp.** This is the sharpest demonstration in the experiment. M2's exploitation of post-treatment mediators and circular derived features in `CB_ALL_FEATURES` drives MdAPE toward 2%, while M5 faces the honest ≈21% floor imposed by the information content of upstream features alone. An analyst who selected models by CV MdAPE alone would choose M2 over M5 by a factor of ten in apparent error — and deploy the wrong model.
+
+**Frequentist pair (M4 vs M1): ΔMdAPE = +8.0 pp.** OLS exploits `ghg_intensity` linearly, but less efficiently than XGBoost. The ΔMdAPE is moderate rather than dramatic because M1's OLS coefficients on the circular features are a blunt instrument: they cannot capture the nonlinear intensity–area interaction that XGBoost learns directly. M4 also suffers from OLS's structural limitations on the causal side, further compressing the gap.
+
+**Bayesian pair (M6 vs M3): ΔMdAPE = +0.4 pp.** The gap is nearly zero, consistent with the predicted direction and magnitude. P6's Bayesian sub-conjecture — that the gap would be the smallest of the three — survives. Because M3's parametric structure does not directly condition on the circular derived features — they are present in `CB_ALL_FEATURES` but absent from the generative model's likelihood — the circular features cannot inflate M3's apparent performance. The 0.4 pp difference is the residual effect of training on a larger dataset (21,714 vs 21,406 rows) and without GroupKFold, not of feature exploitation.
+
+
+## 4.3 Deployment Test: The Separation of the Pipelines — P7, P8
+
+Cross-validation evaluates models on buildings they have seen in other years. The deployment test evaluates all six models on 5,510 non-compliant buildings that no model has ever seen and that have no observed energy data. This is the operative question for a city that wants to estimate GHG for its entire building stock, not just its reporters. Log-scale predictions are clipped to [−20, 15] before exponentiation to prevent numerical overflow; e¹⁵ ≈ 3.3 × 10⁶ metric tons is a physical ceiling well above any real building. The median is the primary summary statistic; the mean is reported but is sensitive to OLS extrapolation outliers.
+
+**Table 2 — Deployment test: predicted GHG for 5,510 non-compliant buildings.** Median is the primary statistic. CB models receive training-median imputation for mediators and derived metrics; causal models receive structural zeros for mediators. The observed compliant-building median is ≈ 1,018 metric tons CO₂e.
+
+| Model | Pipeline | Median (t CO₂e) | Mean (t CO₂e) |
+|---|---|---|---|
+| M1 CB OLS | causally-blind | 486 | 2,640 |
+| M2 CB XGB | causally-blind | 641 | 968 |
+| M3 CB Bayes | causally-blind | 1,025 | 1,184 |
+| M4 Causal OLS | causal | 854 | 3,865 |
+| M5 Causal XGB | causal | 1,213 | 1,701 |
+| M6 Causal Bayes | causal | 1,043 | 1,323 |
+
+**Finding 6 — The causal models are stable and mutually consistent; the CB models are not — P7 corroborated.** M4, M5, and M6 produce deployment medians of 854, 1,213, and 1,043 metric tons respectively — a range of 359 tons around the observed compliant building median of ≈1,018 tons. The variation across causal models is attributable to estimator differences (OLS linearity, XGBoost nonlinearity, Bayesian partial pooling), not to instability in the prediction target. All three predict the same physical quantity using causally legitimate information. The CB medians span 486 to 1,025 tons — a 539-ton range among models nominally using the same underlying data — because each exploits the circular features differently and is therefore predicting different implicit quantities.
+
+**Finding 7 — M2 CB XGB no longer collapses to near-zero, but its predictions are still causally invalid — P7 further corroborated.** In the previous experimental design (mediators only, no derived metrics), M2 predicted near-zero GHG for non-compliant buildings because setting mediators to zero drove the EPA formula output to zero. Under the corrected design, non-compliant buildings receive `cb_medians` imputation for `ghg_intensity_kg_co2e_sq_ft` and all other missing features. M2's deployment median is 641 metric tons — not zero, and plausible on its face. But the prediction is still causally invalid: M2's deployment prediction is approximately a function of training-median energy features (all mediators and derived metrics collapsed to constants by imputation) and floor area (the only input that varies across non-compliant buildings). The pre-registered mechanism in P7 attributed this constant baseline specifically to ghg_intensity; the SHAP attribution in `diagnostic/m2_shap.py` reveals it is driven primarily by median-imputed mediators, with ghg_intensity contributing additionally. The outcome P7 anticipated — floor area as the sole source of cross-building variation, all energy features constant — is confirmed regardless. The model has no access to the building's actual energy behaviour, which is unknown by construction. The narrow mean–median gap (968 vs 641 tons) establishes that floor area is the only feature driving cross-building variation in M2's deployment predictions; all circular features have been collapsed to a constant.  This is a more insidious failure mode than the near-zero collapse: the predictions look numerically reasonable, and a practitioner without causal domain knowledge might trust them.
+
+**Finding 8 — M1 CB OLS shows severe mean inflation from extrapolation — P8 corroborated.** M1's deployment median is 486 metric tons, but its mean is 2,640 — a 5.4× inflation. OLS extrapolates linearly and without constraint beyond the training support. Non-compliant buildings with upstream characteristics (floor area, year built, property type) that lie outside the convex hull of the compliant training set receive extreme predictions; even a small fraction of such buildings inflates the mean substantially while leaving the median unaffected. The median is the correct summary; the mean should not be used for policy purposes.
+
+**Finding 9 — M3 CB Bayes produces a deployment median of 1,025 metric tons, coincidentally close to the causal models, for the wrong reason.** M3's deployment median matches M6's (1,043 tons) to within 18 metric tons. This agreement is not evidence of causal soundness. At deployment, mediators receive `cb_medians` imputation: these values are moderate on the standardised scale (≈0 after standardisation with training mean and standard deviation), so the mediator slopes contribute small increments to μᵢ, and the prediction is dominated by the upstream intercepts α_{j[i]}. M6's predictions are also dominated by upstream intercepts — for the structurally correct reason that upstream features are the only information in the model. The numerical agreement is a coincidence of scale: standardised training-median values happen to produce the same order of magnitude as structural zeros in the causal parameterisation. An analyst who observed only the deployment medians of M3 and M6 would incorrectly conclude that M3 is causally equivalent to M6. It is not.
+
+
+## 4.4 Prediction Audit
+
+Each prediction in Section 3.6 was a bold conjecture derivable from the design before any results were examined. The experiment attempts to falsify each one. A prediction that survives — that is, produces a result inconsistent with its negation — is *corroborated*, not confirmed. Corroboration is not verification: it means the data had the opportunity to refute the conjecture and did not. A prediction that fails is *falsified*, and the failure is reported plainly. The severity of the test matters: a prediction that could easily have been refuted by the data carries more weight when it survives than one whose negation was always unlikely. P1 and P7 face the severest tests — the model could have behaved in many ways — and both survive intact.
+
+**Table 3 — Prediction falsification audit.** Corroborated = the data were inconsistent with the prediction's negation; the conjecture survives this test. Partially falsified = the central prediction survives but a subsidiary claim does not. The partial falsification of P3 is discussed in Section 4.1.3.
+
+| Pred. | Status | Key evidence |
+|---|---|---|
+| P1 | Corroborated | M2: R² = 0.993, MdAPE = 2.1%; the near-identity hypothesis survives |
+| P2 | Corroborated | M5: R² = 0.835, MdAPE = 21.0%; within the predicted [20, 25]% window |
+| P3 | Partially falsified | M4 mean R² = 0.557 survives; fold 4 R² = 0.311 falsifies the predicted floor of 0.40 |
+| P4 | Corroborated | M3: R² = 0.848, MdAPE = 20.9%; parametric structure blocks direct exploitation |
+| P5 | Corroborated | M6 vs M5: ΔMdAPE = 0.4 pp; ΔELPD = +175 in M6's favour |
+| P6 | Corroborated | ΔMdAPE: +8.0 pp (freq.), +18.9 pp (ML), +0.4 pp (Bayes); all positive as required |
+| P7 | Corroborated | Causal medians 854–1,213 t stable; CB medians 486–1,025 t divergent; M2 miscalibrated |
+| P8 | Corroborated | M4: median 854 t, mean 3,865 t; 4.5× mean inflation falsifies OLS stability |
+
+
+## 4.5 Interpretation Limits
+
+**Limit 1 — IPW corrects for observed selection only.** The propensity model conditions on upstream building characteristics (floor area, property type, year built, number of buildings, data year). Selection on unobservables — management quality, tenant behaviour, voluntary retrofit investment, awareness of the reporting requirement — remains uncorrected. The maximum normalised weight of 1.32 indicates that the selection distortion on observed characteristics is moderate, but we cannot bound the unobserved component.
+
+**Limit 2 — The deployment test evaluates ordinal plausibility, not ground truth.** Non-compliant buildings have no observed GHG; we cannot compute a deployment R² or MdAPE. The deployment test establishes whether predictions are in the right order of magnitude and whether they are stable across the non-compliant population. It does not prove that the causal medians of 854–1,213 metric tons are correct — only that they are consistent with the observed compliant-building distribution and physically plausible.
+
+**Limit 3 — Causal deployment predictions are sensitive to the upstream feature distribution of non-compliant buildings.** Non-compliant buildings tend to be smaller and older than compliant ones, which is reflected in M4's lower deployment median (854 tons) relative to the compliant-building median (1,018 tons). M5 and M6 predict higher deployment medians (1,213 and 1,043 tons respectively) because XGBoost and hierarchical Bayes capture the nonlinear GHG–size relationship differently from OLS. The range of causal deployment medians (359 tons) is a legitimate estimator uncertainty that should be propagated to any policy analysis built on these predictions.
+
+**Limit 4 — The 0.4 pp Bayesian gap in ΔMdAPE does not imply that Bayesian models are immune to the compliance gate problem.** M3's near-zero CV gap relative to M6 follows from its parametric structure, not from any inherent Bayesian robustness to circular features. A Bayesian model that assigned explicit slope parameters to `ghg_intensity` — an entirely reasonable modelling choice — would show the same near-identity exploitation as M2 CB XGB, likely with R² > 0.99 and PSIS-LOO ELPD orders of magnitude above M6. The lesson is not that Bayesian models are safer; it is that the generative model's parametric structure determines what information the model can exploit, and that structure must be grounded in a verified DAG.

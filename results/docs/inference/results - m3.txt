@@ -1,0 +1,96 @@
+PS D:\projects\1stArxivPaper> uv run python inference/scripts/m3_inference.py
+======================================================================
+STEP 1 -- FETCHING DATA
+======================================================================
+Fetching Chicago Energy Benchmarking data ...
+  50,000 records ...
+  Total records: 28,329
+
+
+======================================================================
+STEP 2 -- PREPROCESSING  (CB pipeline)
+======================================================================
+Building compliance flag ...
+Imputing upstream features (shared, global median) ...
+
+  Causally-blind row set   : 21,714 rows (all rows with observed target)
+Filling CB features with column medians (naive analyst default) ...
+  Causal row set           : 21,406 rows (compliant + observed target)
+
+  Row count difference     : 308 rows — naive analyst uses more data and still gets the wrong answer.
+Applying structural zeros for causal pipeline (verified DAG) ...
+Fitting propensity model on full dataset ...
+  Propensity model accuracy : 0.951
+  IPW 99th-pct cap     : 1.382
+  IPW max (normalised) : 1.322
+
+  Non-compliant (deployment test) : 5,510 rows
+
+  Alignment verified:
+    CB pipeline    : 21,714 rows (target, log-target, bids)
+    Causal pipeline: 21,406 rows (target, log-target, bids, IPW)
+  CB training rows : 21,714
+
+======================================================================
+STEP 3 -- LOADING M3 TRACE
+  Source : D:\projects\1stArxivPaper\inference\m3_trace.nc
+======================================================================
+  Loaded : 4 chains x 3000 draws
+  M6 trace loaded for upstream comparison.
+
+======================================================================
+STEP 4 -- MCMC DIAGNOSTICS
+======================================================================
+  R-hat max : 1.0035
+  ESS min   : 548
+  Divergences: 0
+    Saved -> D:\projects\1stArxivPaper\inference\figures\m3\fig_m3_trace.png
+    Saved -> D:\projects\1stArxivPaper\inference\figures\m3\fig_m3_rhat_ess.png
+
+======================================================================
+STEP 5 -- MEDIATOR COEFFICIENT POSTERIORS
+======================================================================
+  (coefficients are on standardised mediators in log1p(GHG) space)
+
+  electricity                     mean = +0.0783  89% PI = [+0.0705, +0.0861]
+  natural gas                     mean = +0.1130  89% PI = [+0.1075, +0.1186]
+  district steam                  mean = +0.0031  89% PI = [-0.0023, +0.0086]
+  district chilled water          mean = +0.0304  89% PI = [+0.0254, +0.0355]
+  all other fuel                  mean = -0.0038  89% PI = [-0.0083, +0.0007]
+
+  Upstream slopes (for comparison):
+  log floor area                  mean = +0.8977  89% PI = [+0.8909, +0.9047]
+  log # buildings                 mean = -0.0308  89% PI = [-0.0423, -0.0192]
+  data year                       mean = -0.1386  89% PI = [-0.1432, -0.1339]
+  year built                      mean = +0.0523  89% PI = [+0.0473, +0.0573]
+    Saved -> D:\projects\1stArxivPaper\inference\figures\m3\fig_m3_mediator_slopes.png
+
+======================================================================
+STEP 6 -- UPSTREAM SLOPE COMPARISON: M3 vs M6
+======================================================================
+  Parameter               M3 mean              M3 89% PI      M6 mean              M6 89% PI
+  ------------------------------------------------------------------------------------------
+  log floor area          +0.8977  [+0.8909, +0.9047]      +0.9788  [+0.9727, +0.9850]
+  log # buildings         -0.0308  [-0.0423, -0.0192]      +0.0141  [+0.0022, +0.0259]
+  data year               -0.1386  [-0.1432, -0.1339]      -0.1447  [-0.1495, -0.1399]
+  year built              +0.0523  [+0.0473, +0.0573]      +0.0467  [+0.0416, +0.0518]
+    Saved -> D:\projects\1stArxivPaper\inference\figures\m3\fig_m3_upstream_vs_m6.png
+
+======================================================================
+SUMMARY  —  M3 MEDIATOR POSTERIORS
+======================================================================
+
+  Mediator slopes (standardised inputs, log1p GHG scale):
+    electricity                     mean=+0.0783  89% PI width=0.0156
+    natural gas                     mean=+0.1130  89% PI width=0.0111
+    district steam                  mean=+0.0031  89% PI width=0.0109
+    district chilled water          mean=+0.0304  89% PI width=0.0101
+    all other fuel                  mean=-0.0038  89% PI width=0.0090
+
+  Key question: are mediator slopes large relative to upstream slopes?
+  If the log-linear likelihood mis-specification dilutes the mediator
+  signal, mediator posterior means will be small and/or wide relative
+  to the variance they should explain given the EPA formula structure.
+
+  Figures saved to: D:\projects\1stArxivPaper\inference\figures\m3
+======================================================================

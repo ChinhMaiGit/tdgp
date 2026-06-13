@@ -1,0 +1,199 @@
+PS D:\projects\1stArxivPaper> uv run python sensitivity/scripts/sensitivity.py
+======================================================================
+STEP 1 -- FETCHING DATA
+======================================================================
+Fetching Chicago Energy Benchmarking data ...
+  50,000 records ...
+  Total records: 28,329
+
+
+======================================================================
+STEP 2 -- PREPROCESSING
+======================================================================
+Building compliance flag ...
+Imputing upstream features (shared, global median) ...
+
+  Causally-blind row set   : 21,714 rows (all rows with observed target)
+Filling CB features with column medians (naive analyst default) ...
+  Causal row set           : 21,406 rows (compliant + observed target)
+
+  Row count difference     : 308 rows — naive analyst uses more data and still gets the wrong answer.
+Applying structural zeros for causal pipeline (verified DAG) ...
+Fitting propensity model on full dataset ...
+  Propensity model accuracy : 0.951
+  IPW 99th-pct cap     : 1.382
+  IPW max (normalised) : 1.322
+
+  Non-compliant (deployment test) : 5,510 rows
+
+  Alignment verified:
+    CB pipeline    : 21,714 rows (target, log-target, bids)
+    Causal pipeline: 21,406 rows (target, log-target, bids, IPW)
+  Causal training rows : 21,406
+
+======================================================================
+STEP 3 -- IPW WEIGHT ARRAYS  (95th / 99th / 99.9th pct caps)
+======================================================================
+  Cap           Raw cap val   Max (norm)  Mean (norm)
+  ────────────────────────────────────────────────────
+  95th pct            1.213        1.166        1.000
+  99th pct            1.382        1.322        1.000
+  99.9th pct          2.884        2.750        1.000
+
+======================================================================
+STEP 4 -- LOADING BASE TRACE  (M6 from experiment)
+  Source : D:\projects\1stArxivPaper\inference\m6_trace.nc
+======================================================================
+  Loaded : 4 chains x 3000 draws
+
+======================================================================
+STEP 5 -- FITTING SENSITIVITY MODELS  (4 x 3000/3000 draws)
+  Tight prior : slope sigma=0.25, scale sigma=0.50, IPW 99th
+  Wide prior  : slope sigma=1.00, scale sigma=2.00, IPW 99th
+  IPW 95th    : base prior (sigma=0.50), 95th-pct cap
+  IPW 99.9th  : base prior (sigma=0.50), 99.9th-pct cap
+======================================================================
+
+  Fitting: Tight prior  (slope=0.25, scale=0.50, IPW 99th)
+    prior_slope_sigma = 0.25  prior_scale_sigma = 0.5  ipw max = 1.322
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 4 jobs)
+NUTS: [alpha_bar, sigma_alpha, alpha_offset, beta_A, beta_B, beta_T, beta_Y, sigma]
+
+                                                              Grad
+  Progress                Draw        Divergen…   Step size   evals       Speed                  Elapsed     Remaining
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.033       127         42.71 draws/s          0:02:20     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.030       127         42.42 draws/s          0:02:21     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.034       127         41.88 draws/s          0:02:23     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.040       127         41.79 draws/s          0:02:23     0:00:00
+
+Sampling 4 chains for 3_000 tune and 3_000 draw iterations (12_000 + 12_000 draws total) took 155 seconds.
+
+  Fitting: Wide prior   (slope=1.00, scale=2.00, IPW 99th)
+    prior_slope_sigma = 1.0  prior_scale_sigma = 2.0  ipw max = 1.322
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 4 jobs)
+NUTS: [alpha_bar, sigma_alpha, alpha_offset, beta_A, beta_B, beta_T, beta_Y, sigma]
+
+                                                              Grad
+  Progress                Draw        Divergen…   Step size   evals       Speed                  Elapsed     Remaining
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.026       127         35.82 draws/s          0:02:47     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.026       127         36.07 draws/s          0:02:46     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.034       127         36.26 draws/s          0:02:45     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.032       127         36.84 draws/s          0:02:42     0:00:00
+
+Sampling 4 chains for 3_000 tune and 3_000 draw iterations (12_000 + 12_000 draws total) took 178 seconds.
+
+  Fitting: IPW 95th pct (base prior, aggressive cap)
+    prior_slope_sigma = 0.5  prior_scale_sigma = 1.0  ipw max = 1.166
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 4 jobs)
+NUTS: [alpha_bar, sigma_alpha, alpha_offset, beta_A, beta_B, beta_T, beta_Y, sigma]
+
+                                                              Grad
+  Progress                Draw        Divergen…   Step size   evals       Speed                  Elapsed     Remaining
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.030       127         30.30 draws/s          0:03:18     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.029       127         30.81 draws/s          0:03:14     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.037       127         30.17 draws/s          0:03:18     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.034       63          31.08 draws/s          0:03:13     0:00:00
+
+Sampling 4 chains for 3_000 tune and 3_000 draw iterations (12_000 + 12_000 draws total) took 210 seconds.
+
+  Fitting: IPW 99.9th pct (base prior, lenient cap)
+    prior_slope_sigma = 0.5  prior_scale_sigma = 1.0  ipw max = 2.750
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 4 jobs)
+NUTS: [alpha_bar, sigma_alpha, alpha_offset, beta_A, beta_B, beta_T, beta_Y, sigma]
+
+                                                              Grad
+  Progress                Draw        Divergen…   Step size   evals       Speed                  Elapsed     Remaining
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.024       127         30.80 draws/s          0:03:14     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.042       127         31.32 draws/s          0:03:11     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.038       127         31.72 draws/s          0:03:09     0:00:00
+  ━━━━━━━━━━━━━━━━━━━━━   6000        0           0.043       127         31.60 draws/s          0:03:09     0:00:00
+
+Sampling 4 chains for 3_000 tune and 3_000 draw iterations (12_000 + 12_000 draws total) took 204 seconds.
+
+  All sensitivity models fitted.
+
+======================================================================
+STEP 6 -- MCMC DIAGNOSTICS
+======================================================================
+
+  Specification                                   Div    R-hat    ESS
+  ────────────────────────────────────────────────────────────────────
+  Base (M6, slope=0.50, IPW 99th)                   0   1.0095    526
+  Tight prior  (slope=0.25, IPW 99th)               0   1.0046    503
+  Wide prior   (slope=1.00, IPW 99th)               0   1.0051    719
+  IPW 95th pct (base prior)                         0   1.0045    656
+  IPW 99.9th pct (base prior)                       0   1.0018    460
+
+======================================================================
+STEP 7 -- PARAMETER COMPARISON
+======================================================================
+
+  Prior specification sensitivity (IPW fixed at 99th pct cap)
+  Parameter                         mean [89% PI]                   mean [89% PI]                   mean [89% PI]
+                   Base (M6, slope=0.50, IPW 99th  Tight prior  (slope=0.25, IPW   Wide prior   (slope=1.00, IPW
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  beta_A            +0.979 [+0.973, +0.985]  +0.979 [+0.973, +0.985]  +0.979 [+0.973, +0.985]
+  beta_T            -0.145 [-0.150, -0.140]  -0.145 [-0.150, -0.140]  -0.145 [-0.150, -0.140]
+  sigma_alpha       +0.483 [+0.409, +0.568]  +0.480 [+0.408, +0.567]  +0.484 [+0.409, +0.572]
+  sigma             +0.430 [+0.427, +0.434]  +0.430 [+0.427, +0.434]  +0.430 [+0.427, +0.434]
+
+  IPW trim cap sensitivity (priors fixed at base spec)
+  Parameter                         mean [89% PI]                   mean [89% PI]                   mean [89% PI]
+                        IPW 95th pct (base prior)  Base (M6, slope=0.50, IPW 99th     IPW 99.9th pct (base prior)
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  beta_A            +0.979 [+0.973, +0.985]  +0.979 [+0.973, +0.985]  +0.977 [+0.971, +0.983]
+  beta_T            -0.145 [-0.150, -0.140]  -0.145 [-0.150, -0.140]  -0.145 [-0.150, -0.140]
+  sigma_alpha       +0.482 [+0.410, +0.568]  +0.483 [+0.409, +0.568]  +0.483 [+0.411, +0.566]
+  sigma             +0.430 [+0.427, +0.434]  +0.430 [+0.427, +0.434]  +0.431 [+0.427, +0.434]
+
+  Robustness assessment  (shift = max |Δmean| vs base)
+  Parameter         Prior shift   % of CI hw    IPW shift   % of CI hw  Flag
+  ────────────────────────────────────────────────────────────────────────────
+  beta_A                 0.0002         3.2%       0.0018        29.0%  ⚠
+  beta_T                 0.0000         1.0%       0.0005        11.0%  ✓
+  sigma_alpha            0.0026         3.2%       0.0009         1.2%  ✓
+  sigma                  0.0000         0.5%       0.0004        11.3%  ✓
+
+  ✓ = shift < 20% of 89% CI half-width  (robust)
+  ⚠ = shift >= 20% of 89% CI half-width  (review required)
+
+======================================================================
+STEP 8 -- GENERATING FOREST PLOT
+======================================================================
+    Saved -> D:\projects\1stArxivPaper\sensitivity\figures\fig_sensitivity_forest.png
+
+======================================================================
+SENSITIVITY SUMMARY  —  M6 CAUSAL BAYES
+======================================================================
+  Base specification: draws=3000, tune=3000, chains=4,
+    target_accept=0.95, CHAIN_SEEDS=[20, 21, 22, 23]
+    prior: slope sigma=0.50, scale sigma=1.00, IPW 99th pct cap
+
+  New fits: 4  (tight prior, wide prior, IPW-95, IPW-99.9)
+  Parameters tested: ['beta_A', 'beta_T', 'sigma_alpha', 'sigma']
+
+  Specification                                   Div    R-hat    ESS
+  ────────────────────────────────────────────────────────────────────
+  Base (M6, slope=0.50, IPW 99th)                   0   1.0095    526
+  Tight prior  (slope=0.25, IPW 99th)               0   1.0046    503
+  Wide prior   (slope=1.00, IPW 99th)               0   1.0051    719
+  IPW 95th pct (base prior)                         0   1.0045    656
+  IPW 99.9th pct (base prior)                       0   1.0018    460
+
+  Robustness (shift as % of 89% CI half-width):
+  Parameter         Max prior shift  Max IPW shift  Flag
+  ──────────────────────────────────────────────────────
+  beta_A                       3.2%          29.0%  ⚠
+  beta_T                       1.0%          11.0%  ✓
+  sigma_alpha                  3.2%           1.2%  ✓
+  sigma                        0.5%          11.3%  ✓
+
+  Figure saved to: D:\projects\1stArxivPaper\sensitivity\figures

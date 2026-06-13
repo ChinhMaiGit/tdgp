@@ -1,0 +1,170 @@
+diagnostic/docs/results_explanation.txt
+========================================
+Explanation of M2 SHAP diagnostic results (results.txt)
+Date: 2026-05-25
+
+
+OVERVIEW
+--------
+The diagnostic fitted M2 (causally-blind XGBoost on CB_ALL_FEATURES) on
+the full 21,714-row CB training dataset and computed SHAP values to
+attribute its predictive signal across feature groups. The headline
+metrics confirm the near-perfect performance expected from the experiment:
+R²(log) = 0.9991, MdAPE = 1.64%.
+
+The SHAP attribution reveals the mechanism behind that performance — and
+it is not what the script's own summary emphasises. The full picture is
+more significant than originally anticipated.
+
+
+WHAT THE RESULTS ACTUALLY SHOW
+--------------------------------
+
+Feature group breakdown:
+
+  Mediators (electricity, gas, steam, chilled water, other fuel) : 57.2%
+  Upstream causal (floor area, property type, year built, etc.)  : 26.1%
+  Derived / circular (ghg_intensity, EUIs, energy star, etc.)    : 15.0%
+  Compliance metadata                                            :  1.0%
+  Spatial                                                        :  0.6%
+  Water use                                                      :  0.0%
+
+Top individual features:
+
+  electricity_use_kbtu               42.3%   mediator
+  gross_floor_area_buildings_sq_ft   20.3%   upstream causal
+  natural_gas_use_kbtu               13.4%   mediator
+  ghg_intensity_kg_co2e_sq_ft         9.3%   derived / circular
+  data_year                           5.2%   upstream causal
+
+The finding differs from the script's initial framing. The script
+expected ghg_intensity to dominate as the primary circular feature.
+Instead, electricity_use_kbtu accounts for 42.3% of total SHAP signal —
+nearly three times the contribution of ghg_intensity.
+
+
+WHY ELECTRICITY DOMINATES INSTEAD OF GHG INTENSITY
+----------------------------------------------------
+Total GHG emissions are computed by multiplying each fuel source by its
+EPA emission factor:
+
+  total_GHG ≈ electricity × EF_e + natural_gas × EF_g
+            + district_steam × EF_s + ...
+
+XGBoost can learn this relationship directly from the mediator columns
+without needing to go through ghg_intensity (which is itself derived from
+the same fuel data). The relationship electricity → GHG is a direct
+monotone mapping. Given that electricity is the dominant energy source
+in Chicago commercial buildings, it captures the single largest slice of
+predictive signal.
+
+ghg_intensity still contributes 9.3% — it provides a marginal advantage
+by compressing the fuel-to-GHG transformation into one feature — but it
+is not the primary vehicle for M2's exploitation. The mediators are.
+
+
+THE STRONGER ARGUMENT
+---------------------
+The original paper framing emphasised circular derived features as the
+mechanism behind M2's inflated performance. The SHAP results refine and
+strengthen this argument:
+
+  Mediators + derived/circular = 57.2% + 15.0% = 72.2% of total SHAP
+
+72.2% of M2's predictive signal comes from features that are either:
+
+  (a) Post-treatment (mediators) — only observed for compliant buildings
+      that have already submitted a report. Non-compliant buildings have
+      no actual mediator data at deployment; the model receives imputed
+      training column medians for all mediator columns.
+
+  (b) Circular / tautological (derived metrics) — computed from the same
+      fuel data that produces GHG emissions. Including ghg_intensity as a
+      predictor of total_GHG is definitionally circular.
+
+Only 26.1% of M2's signal comes from upstream causal features — the only
+features that are genuinely available and causally valid for any building,
+compliant or not.
+
+
+WHY THIS EXPLAINS THE DEPLOYMENT FAILURE
+-----------------------------------------
+When M2 is applied to the 5,510 non-compliant buildings (the deployment
+test in the experiment), those buildings have no observed energy data.
+Every mediator column and every derived metric column is imputed with the
+training median — a constant value identical for every non-compliant
+building.
+
+The consequence: 72.2% of M2's signal collapses to a constant at
+deployment. The model's predictions then depend almost entirely on the
+26.1% upstream signal (floor area, property type, year built), producing
+predictions equivalent to:
+
+  GHG_deploy ≈ f(floor_area, property_type, year) + constant
+
+where "constant" is the contribution from median-imputed mediators and
+derived metrics — the same for every non-compliant building regardless of
+its actual energy behaviour. This is why the deployment experiment found
+M2's predictions centred on ~641 metric tons with variation driven only by
+floor area — the imputed mediators provide no cross-building differentiation.
+
+This is the more insidious failure mode noted in the experiment docs:
+the predictions look numerically plausible (641 metric tons is within the
+reasonable range), but the cross-building variation is causally wrong.
+The model assigns the same "average compliant building" energy profile to
+every non-compliant building irrespective of its actual characteristics.
+
+
+REVISED PAPER ARGUMENT
+-----------------------
+The SHAP results support a refined version of the circular feature
+exploitation argument:
+
+  Original framing: M2 exploits ghg_intensity (a circular derived metric)
+  to achieve near-perfect CV metrics.
+
+  Refined framing: M2 exploits post-treatment mediator variables (57.2%
+  of SHAP) and circular derived metrics (15.0% of SHAP) — together 72.2%
+  of its predictive signal. These features are unavailable or causally
+  invalid at deployment. The model is not learning the GHG data-generating
+  process; it is learning to reconstruct the EPA emission accounting formula
+  from the observed fuel inputs of buildings that have already reported.
+  Causal XGB (M5), restricted to upstream features only, achieves 26.1%
+  of M2's feature basis — and this is the honest performance ceiling.
+
+This is a stronger argument because it shows the problem is not limited to
+one circular feature (ghg_intensity) but is structural: any model trained on
+mediators will face the same deployment failure for the same reason, and the
+72.2% figure quantifies the scale of that structural unsoundness.
+
+
+WHAT THIS DOES NOT CHANGE
+--------------------------
+These results do not alter the experiment's conclusions. The deployment test
+already demonstrated M2's miscalibration on non-compliant buildings. The
+SHAP analysis explains the mechanism: it is the mediator exploitation (not
+just derived feature exploitation) that drives both the inflated CV metrics
+and the deployment failure.
+
+The pre-registered prediction P1 — "M2 CB XGB will achieve near-perfect CV
+metrics via circular/tautological feature selection" — is still corroborated.
+The SHAP results add precision: the near-tautological relationship operates
+primarily through mediators (direct fuel → GHG mapping) rather than through
+ghg_intensity alone.
+
+
+FIGURES PRODUCED
+----------------
+fig_shap_beeswarm.png  : Per-observation SHAP values, top 20 features.
+                         Shows electricity_use_kbtu with by far the widest
+                         impact range, followed by floor area and natural gas.
+
+fig_shap_bar.png       : Mean |SHAP| bar chart, top 25 features, coloured
+                         by group. Orange bars (mediators) dominate the top
+                         of the chart; red bars (derived/circular) appear
+                         mid-chart around ghg_intensity and the EUI variants.
+
+fig_shap_group.png     : Grouped bar showing 57.2% mediator, 26.1% upstream,
+                         15.0% derived/circular. The core visual for the
+                         paper argument: nearly three-quarters of M2's signal
+                         is invalid at deployment.

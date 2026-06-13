@@ -1,0 +1,62 @@
+X_s, X_o -> M  association check   (log1p mediator ~ upstream)
+Source: mediator/scripts/upstream_to_mediator.py  (live Socrata fetch, n=28,329)
+Sample: rows with the mediator observed AND complete upstream, floor area > 0,
+        mediator value finite and >= 0.
+
+Nested blocks (added in order):
+  R2(area)  : log1p(M) ~ log(floor area)
+  R2(+type) : + property type fixed effects
+  R2(full)  : + year built + no. buildings + data-year fixed effects
+beta_area = elasticity of log1p(M) wrt log(floor area) in the full model.
+Differences between columns = each block's contribution to fit.
+
+Mediator                                 n   R2(area)  R2(+type)  R2(full)  beta_area
+-----------------------------------------------------------------------------------
+Electricity                         22,724     0.467     0.544      0.567      1.032
+Natural gas                         21,253     0.045     0.123      0.183      0.756
+District steam (struct. zero)        5,677     0.000     0.408      0.811      0.034
+District chilled water (struct.zero) 5,837     0.092     0.224      0.769      0.460
+Other fuel                            absent from API (near-empty column)
+TOTAL metered energy                22,723     0.438     0.472      0.488      0.942
+
+Reading:
+ - Electricity and TOTAL metered energy: strongly area-driven, near-proportional
+   (beta_area ~ 1.0; area alone explains ~44-47%). Clean corroboration of X_s -> M
+   and of the proportional (log1p) scaling.
+ - Natural gas: weak on area alone (R2=0.045), rises to 0.123 with property type and
+   0.183 with all controls;
+   gas use is system/type-dependent, not size-driven. Upstream still explains it
+   modestly, with type (X_s) carrying most of it.
+ - District steam / chilled water (structural zeros): area ~ irrelevant
+   (beta ~ 0.03, 0.46) but property type + year explain presence well (R2_full
+   0.77-0.81). The "link" here is X -> presence on the district network, not
+   X(area) -> magnitude -- consistent with their structural-zero nature.
+ - Association only; the X -> M direction rests on physical/temporal order
+   (building characteristics precede and drive energy use), not these fits.
+
+
+Robustness -- marginal contribution of data_year to M (RAW vs ADJUSTED R^2)
+Base = area + property type + year built + no. buildings;  full = + data-year FE.
+Adjusted R^2 penalises the ~9 year dummies; partial F tests the year block.
+
+Mediator                   n      R2_base R2_full aR2_base aR2_full  d_aR2   F_year     p
+Electricity            22,724     0.556   0.567   0.555    0.567   +0.0113    67.0  2.0e-122
+Natural gas            21,253     0.131   0.183   0.130    0.182   +0.0518   150.3  9.8e-277
+District steam (s.z.)   5,677     0.411   0.811   0.410    0.810   +0.4007  1329.8   ~0
+District chilled (s.z.) 5,837     0.227   0.769   0.225    0.768   +0.5429  1518.0   ~0
+TOTAL metered energy   22,723     0.473   0.488   0.473    0.487   +0.0146    73.0  1.4e-133
+
+Reading:
+ - Adjusted R^2 rises for every mediator, so data_year -> M is genuine, not a
+   mechanical R^2 gain from more regressors. Effect is small for the dominant
+   fuels (electricity / total ~1-1.5 pp), modest for gas (~5 pp), large for the
+   district structural zeros (40-54 pp, most likely year-varying reporting /
+   coverage of those niche fields rather than real consumption).
+ - At n ~ 22k the partial-F p-values are all ~0 (everything is significant);
+   the adjusted-R^2 delta is the honest effect-size read.
+ - Framing: in the paper these regressions CORROBORATE pre-specified edges (from
+   documents + physical/temporal logic), they are NOT variable selection. R^2
+   stays the reported metric; the full-model adjusted R^2 is shown alongside in
+   Table 4.3 only to demonstrate the parameter count is immaterial at this n
+   (gap <= 0.001). Switching to adjusted R^2 as the criterion would wrongly
+   signal data-driven selection.

@@ -1,0 +1,31 @@
+\begin{table}[ht]
+\centering
+\setlength{\tabcolsep}{6pt}
+\small
+\caption{Out-of-sample performance for the 2$\times$3 factorial design (realistic comparison). Causally-blind pipeline: $\sim$21{,}714 rows (all observed target), ALL features (including derived metrics), KFold(5), no IPW. Causal pipeline: $\sim$21{,}406 rows (compliant only), upstream features only, GroupKFold(5) on building ID, IPW back-door adjustment. The large positive $\Delta$MdAPE for ML is \emph{expected}: the causally-blind XGBoost exploits post-treatment mediators (e.g.\ \texttt{electricity\_use\_kbtu}) and circular derived metrics (e.g.\ \texttt{ghg\_intensity\_kg\_co2e\_sq\_ft}) in \texttt{CB\_ALL\_FEATURES}, both groups unavailable or invalid at deployment. ELPD: Normal-approximation CV for OLS and XGBoost; PSIS-LOO for Hierarchical Bayes. $^{\ddagger}$~Bayesian RMSE from PSIS-LOO predictive means; not comparable to fold-median RMSE.}
+\label{tab:model_comparison}
+\begin{tabular}{llccccc}
+\toprule
+Pipeline & Approach & $R^2(\log)$ & MdAPE & Med.\ RMSE$^{\ddagger}$ & 89\% PI cov. & ELPD \\
+\midrule
+\multicolumn{7}{l}{\textit{Panel A: Causally-blind pipeline (no IPW, ALL features, KFold)}} \\
+\midrule
+& OLS & +0.756 & 31.5\% & 174,020 & 93.8\% & -17,075 \\
+& XGBoost & +0.993 & 2.1\% & 1,185 & 96.7\% & 22,317 \\
+& Hier. Bayes$^{\dagger}$ & +0.848 & 20.9\% & 213 & 92.4\% & -11,937 \\
+\midrule
+\multicolumn{7}{l}{\textit{Panel B: Causal pipeline (IPW, upstream features, GroupKFold)}} \\
+\midrule
+& OLS & +0.557 & 39.5\% & 129,691 & 93.1\% & -22,716 \\
+& XGBoost & +0.835 & 21.0\% & 2,584 & 92.4\% & -12,491 \\
+& Hier. Bayes$^{\dagger}$ & +0.838 & 21.4\% & 218 & 92.8\% & -12,316 \\
+\midrule
+\multicolumn{7}{l}{\textit{Panel C: IPW effect (causal $-$ causally-blind; positive $\Delta$MdAPE = causal has higher error)}} \\
+\midrule
+& Frequentist & -0.199 & 8.0\% & -44,328 & -0.6\% & -5,641 \\
+& ML & -0.158 & 18.9\% & 1,399 & -4.3\% & -34,809 \\
+& Bayesian & -0.010 & 0.4\% & 5 & 0.4\% & -378 \\
+\bottomrule
+\multicolumn{7}{l}{\footnotesize $^{\dagger}$~PSIS-LOO; fold variance not applicable. $^{\ddagger}$~Bayesian RMSE from LOO predictive means.} \\
+\end{tabular}
+\end{table}

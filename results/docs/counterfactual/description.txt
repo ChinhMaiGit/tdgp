@@ -1,0 +1,148 @@
+counterfactual/
+===============
+Purpose
+-------
+This folder contains the counterfactual analysis for M6 Causal Bayes — the
+structural model in the 2x3 factorial experiment. Counterfactual outputs
+operationalise Pearl's third rung of the ladder of causation (Rung 3:
+"What would have happened if...?"), demonstrating that the TDGP pipeline
+supports causal queries beyond prediction.
+
+All computations are analytical: they use the saved M6 posterior trace
+(inference/m6_trace.nc) and require no additional MCMC sampling. Each
+counterfactual query substitutes a single feature value in the posterior
+predictive formula while holding all other covariates at observed values.
+
+The three outputs map directly to the paper's policy-facing findings:
+  Output 4  — Decarbonisation pace and policy gap (structural finding)
+  Output 5a — Compliance risk under do(data_year = 2030) (CF1)
+  Output 5b — Vintage effect under do(year_built = 2010) (CF2)
+
+
+Design
+------
+All counterfactuals are computed from the M6 linear predictor:
+
+  mu_ij = alpha_j + beta_A * log_area_s + beta_B * n_bldg_s
+         + beta_T * year_data_s + beta_Y * year_built_s
+
+where subscript j is the property-type index, s denotes standardisation
+using the causal training set statistics, and alpha_j = alpha_bar +
+delta_j * sigma_alpha (non-centred parameterisation).
+
+Posterior samples: 4 chains x 3000 draws = 12,000 samples per building.
+
+Standardisation constants used (must match M6 training set exactly):
+  year_data  mean = 2019.10,  std = 2.590
+  year_built mean = 1964.29,  std = 37.418
+  log_area   mean and std computed from df_causal["log_area"] column
+
+
+Output 4 -- Decarbonisation pace and policy gap
+------------------------------------------------
+  Inputs : beta_T posterior samples; year_data std from training set
+  Method : annual_rate = beta_T / year_data_std  (per-year rate in log space)
+           %_change = exp(annual_rate) - 1
+           Project a median building forward from BASE_YEAR=2023 to
+           TARGET_YEAR=2040, using median posterior trajectory.
+           Policy gap = required_rate - current_rate (in log/yr)
+  Figure : fig_trend.png
+           Projected GHG trajectory with 89% uncertainty band vs 2040
+           Chicago net-zero target.
+
+
+Output 5a -- CF1: do(data_year = 2030)
+---------------------------------------
+  The intervention sets data_year to 2030 for every building while keeping
+  all other covariates (area, type, year_built, n_buildings) at observed
+  values. This asks: "If the panel observation were collected in 2030 instead
+  of the actual year, how many buildings would fall below the compliance
+  threshold?"
+
+  Compliance threshold: tau_2030 = 25th percentile of observed positive GHG
+  in the training set (~546 t). This proxies the ordinance's reporting
+  threshold effect — buildings below this level are effectively compliant
+  with the GHG performance standard.
+
+  Classification:
+    On-track    P(GHG <= tau_2030 | do(data_year=2030)) > 0.80
+    Uncertain   0.20 -- 0.80
+    High-risk   < 0.20
+
+  Figure : fig_cf1_compliance.png
+           Bar chart of on-track / uncertain / high-risk counts (left);
+           histogram of P(compliant) across all buildings (right).
+
+
+Output 5b -- CF2: do(year_built = 2010)
+-----------------------------------------
+  The intervention sets year_built to 2010 for every building while keeping
+  all other covariates at observed values. This asks: "If all buildings in
+  the portfolio had been built in 2010 instead of their actual vintage, how
+  would GHG emissions differ?"
+
+  Reduction is defined as: factual_GHG - counterfactual_GHG. Positive values
+  mean the older building emits more than a 2010 vintage; negative values
+  mean the 2010 vintage is predicted to emit more.
+
+  Figure : fig_cf2_reduction.png
+           Histogram of per-building GHG delta (left);
+           scatter of factual vs counterfactual GHG (right).
+
+  NOTE: The counterintuitive finding (newer vintage -> higher GHG) is a
+  methodological result, not a data error. See analysis.txt Section 4.
+
+
+Contents
+--------
+scripts/counterfactual.py
+    Main counterfactual script. Steps:
+    1  Fetch data (Socrata API, same as experiment)
+    2  Preprocess (causal pipeline)
+    3  Load M6 trace from inference/m6_trace.nc (no MCMC)
+    4  Reconstruct feature arrays with identical standardisation to M6
+    Output 4  Decarbonisation pace + policy gap figure
+    Output 5a CF1 compliance classification + figure
+    Output 5b CF2 vintage effect + figure
+
+    Run: uv run python counterfactual/scripts/counterfactual.py
+
+
+figures/
+    fig_trend.png
+        Projected GHG trajectory for a median-floor-area building from
+        2023 to 2040, with 89% posterior uncertainty band. Red dashed
+        line = Chicago net-zero target (2040). Blue trajectory = M6
+        projection at current decarbonisation pace.
+
+    fig_cf1_compliance.png
+        Left: stacked bar chart showing on-track / uncertain / high-risk
+        building counts under do(data_year=2030).
+        Right: histogram of P(GHG <= 546 t) across all 21,406 buildings.
+
+    fig_cf2_reduction.png
+        Left: histogram of factual_GHG - CF_GHG under do(year_built=2010).
+        Positive = older building emits more; negative = newer emits more.
+        Right: scatter plot of factual vs counterfactual GHG coloured by
+        property type.
+
+
+docs/
+    description.txt  -- this file
+    results.txt      -- console output from running counterfactual.py
+    analysis.txt     -- interpretation of counterfactual findings
+
+
+Relationship to other folders
+------------------------------
+experiments/  -- establishes M6's role; CV metrics reported there.
+inference/    -- full posterior analysis of M6; saves m6_trace.nc which
+                 this script loads.
+sensitivity/  -- confirms M6 findings are not artefacts of analyst choices.
+counterfactual/ -- demonstrates Rung 3 causal queries using the validated M6.
+
+The four folders form the complete validation and application chain:
+  experiment    -> what M6 achieves relative to alternatives
+  inference     -> what M6 has learned about the DGP
+  sensitivity   -> that what M6 learned does not depend on analyst choices
+  counterfactual -> what M6 can compute that correlational models cannot

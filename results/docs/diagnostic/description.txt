@@ -1,0 +1,59 @@
+diagnostic/
+===========
+Purpose
+-------
+This folder contains targeted diagnostic analyses that support and
+strengthen specific claims made in the paper. Diagnostics are not
+part of the main experiment (experiments/) — they do not introduce
+new models or new comparisons. They take an existing model from the
+experiment and probe it in depth to produce evidence for a specific
+argument.
+
+Each diagnostic is a self-contained script that reuses the exact
+preprocessing and feature definitions from experiments/scripts/pipeline.py.
+Results are saved to diagnostic/figures/.
+
+
+Contents
+--------
+m2_shap.py
+    SHAP attribution analysis for M2 (causally-blind XGBoost).
+
+    Fits M2 on the full CB training dataset (~21,714 rows, CB_ALL_FEATURES)
+    and computes SHAP values to quantify which features drive its near-perfect
+    CV performance (R² > 0.99, MdAPE < 3%).
+
+    Argument it supports: M2's apparent performance is an exploitation
+    artefact, not genuine predictive skill. Post-treatment mediators —
+    primarily electricity_use_kbtu (42.3% of total mean |SHAP|) and
+    natural_gas_use_kbtu (13.4%) — account for the dominant share of
+    M2's predictive signal, because they are direct inputs to the EPA
+    GHG formula and XGBoost learns the near-identity mapping. Circular
+    derived metrics (including ghg_intensity_kg_co2e_sq_ft, 9.3%)
+    contribute additionally. Together these two groups account for 72.2%
+    of M2's signal — features that are either causally post-treatment or
+    algebraically derived from the target, and therefore unavailable or
+    invalid at deployment. SHAP values make this breakdown quantified and
+    visually demonstrable.
+
+    Outputs: fig_shap_beeswarm.png, fig_shap_bar.png, fig_shap_group.png
+
+    Run: uv run python diagnostic/m2_shap.py
+
+
+figures/
+    Output directory for all diagnostic figures. Figures are named
+    fig_<diagnostic>_<content>.png and are referenced by the paper
+    when supporting specific claims.
+
+
+Relationship to the main experiment
+-------------------------------------
+The 2x3 factorial experiment (experiments/) establishes the comparison
+between the causally-blind and causal pipelines and documents all
+pre-registered predictions. Diagnostics sit one level below: they take
+a result from the experiment (e.g., M2's near-perfect CV metrics) and
+open it up to show the internal mechanism.
+
+A diagnostic finding does not change the experiment results. It adds
+mechanistic depth to an already-observed result.

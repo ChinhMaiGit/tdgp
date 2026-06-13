@@ -1,0 +1,37 @@
+M -> Y reconstruction:  total GHG (t CO2e) ~ energy mediators (kBtu)
+Source: mediator/scripts/mediator_to_outcome.py  (live Socrata fetch)
+Sample: n = 21,704 rows with GHG observed; mediator nulls -> 0; linear (EPA
+        accounting is additive, GHG = sum of energy x emission factor).
+
+Single effective factor per fuel
+   intercept=True :  R^2 = 0.98746  (intercept -30.1 t)
+   intercept=False:  R^2 = 0.98744
+
+Recovered effective emission factors (no-intercept):
+   Electricity              169.07 kg CO2e/MBtu
+   Natural gas               53.69 kg CO2e/MBtu   <- EPA published ~53.11 (near-exact)
+   District steam            58.19 kg CO2e/MBtu
+   District chilled water    49.30 kg CO2e/MBtu
+
+Share of total emissions by fuel:
+   Electricity   73.3% | Natural gas 24.7% | District steam 1.8% | Chilled 1.2%
+
+Nested R^2:
+   electricity alone            0.910
+   electricity + natural gas    0.974
+   all four fuels               0.987
+
+Year-specific electricity factor + constant other fuels (no-intercept):
+   R^2 = 0.99990   (essentially exact -> pa(Y) = M)
+   electricity factor by year (kg CO2e/MBtu), shows grid decarbonisation:
+     2014 201.2 | 2015 200.9 | 2016 184.3 | 2017 184.8 | 2018 166.5
+     2019 166.1 | 2020 156.1 | 2021 142.9 | 2022 131.8 | 2023 139.4
+
+Reading:
+ - GHG is an (almost) exact LINEAR function of the metered mediators -> the
+   recorded outcome is computed from M, corroborating pa(Y) = M.
+ - The single-factor residual (0.987 -> 0.9999) is entirely the electricity grid
+   factor falling year on year (201 -> ~132); a fixed factor cannot capture it.
+ - Natural gas factor recovered (53.69) matches the EPA published value (~53.11):
+   the data conform to the documented accounting standard (Stage 3 test).
+ - Electricity is ~73% of emissions; gas ~25%; district heat/cool ~3% combined.

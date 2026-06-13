@@ -1,0 +1,215 @@
+# Experiment Description
+## 2×3 Factorial Design: Causally-Blind vs Causal Pipeline
+
+## 3. Experiment
+
+### 3.1 Data and the Compliance Gate
+
+The Chicago Energy Benchmarking Ordinance requires most commercial and multi-family buildings over 50,000 sq ft to report annual energy use. The dataset covers 28,329 building-year records across 3,852 unique buildings and 10 reporting years (2014–2023), spanning 63 property types. The target variable — total GHG emissions in metric tons CO₂e — is observed for 21,714 records (76.6%) and missing for 6,615 (23.4%).
+
+That 23.4% gap is not a data-quality problem. It is a legal and administrative reality: non-compliant buildings do not submit reports, so their energy use and emissions are structurally unobserved. This compliance gate is the central identification problem the experiment is designed to expose. A model trained on reporters learns P(Y | X, C = 1) — the GHG distribution of the compliant subset — not P(Y | X), the city-wide distribution. Whether that distinction matters for deployment is precisely what the 2×3 factorial tests.
+
+The observed target spans min 0 to max 185,162 metric tons CO₂e, with median ≈ 1,026 and mean ≈ 2,493. The right skew is severe: the mean is 2.4× the median. This rules out modelling on the original scale and motivates a log₁₊ transformation. GHG scales multiplicatively with building size — a multiplicative process is Normal on the log scale, and the +1 shift keeps zero-emission buildings finite.
+
+---
+
+### 3.1.1 The Prediction Problem and Why Metric Choice Is Non-Trivial
+
+The target is a continuous physical quantity — total GHG emissions in metric tons CO₂e per building-year. This makes the problem a regression, not a classification. That distinction matters less than it might seem; what actually makes metric choice difficult here is the distributional properties of the target, not the regression-vs-classification distinction per se.
+
+**The target spans four orders of magnitude.** The observed range is 0 to 185,162 metric tons CO₂e, with a median of ≈ 1,026 and a mean of 2,493. The largest buildings emit roughly 180× the median building. Any absolute-error metric — RMSE, MAE — is therefore dominated by a small number of very large buildings. A model that perfectly predicts every small building but is 50% wrong on the top decile looks catastrophically bad on RMSE, even though for a city estimating building-level emissions across its full stock, small-building accuracy is equally important. This is not a pathology to be ignored; it is a substantive property of the problem.
+
+**MdAPE is the primary evaluation metric for this reason.** The Median Absolute Percentage Error gives a scale-invariant, per-building relative error:
+
+    MdAPE = median_i ( |y_i - ŷ_i| / (y_i + ε) ) × 100
+
+A 21% error on a 100-ton building carries exactly the same weight as a 21% error on a 100,000-ton building. This is the correct criterion for a city that needs accurate estimates for every building — not just an aggregate total where large-building errors cancel out. MdAPE also has a direct interpretive meaning for policy: a model with MdAPE = 21% is wrong by about one-fifth of the true value for a typical building, which a policymaker can reason about concretely. RMSE does not have this property; its value depends on the scale of the distribution and conveys no per-building intuition.
+
+The median (rather than mean) is used to compute the APE summary for the same reason the log₁₊ transformation is used: the right skew means the mean is sensitive to a small number of large-building residuals, while the median reflects the typical building's error. RMSE is reported as a secondary metric for completeness and to allow comparison with other literature, but it is not the primary criterion for model selection or pre-registered predictions.
+
+**R² is reported on the log₁₊ scale, not the original scale.** All models are trained in log₁₊(GHG) space. R²(log) measures the fraction of log-scale variance the model explains, which is the variance the model was actually optimised against. Reporting R² on the original scale would conflate the model's predictive ability with the back-transformation's behaviour on a skewed distribution — a large-building residual on the original scale can dominate R²(original) even when the log-scale fit is excellent. R²(log) is the honest measure of fit for the model as specified.
+
+**ELPD (via PSIS-LOO) is the evaluation criterion for the Bayesian models.** M3 CB Bayes and M6 Causal Bayes are evaluated via Pareto-smoothed importance-sampling leave-one-out cross-validation rather than held-out folds. ELPD is the expected log pointwise predictive density — the sum of log predictive densities at each held-out observation. It is the correct probabilistic criterion for comparing Bayesian models: it rewards models that assign high probability to the actual observed values, not just models that produce low-error point predictions. ELPD from PSIS-LOO is not directly comparable to the fold-based ELPD approximation used for OLS and XGBoost; the two are reported side by side for reference but the within-approach comparison (M3 vs M1/M2, M6 vs M4/M5) is more informative than cross-approach comparison.
+
+**A note on the comparison with classification.** In classification, a random baseline has well-defined performance (1/K for K classes), and accuracy is bounded [0, 1]. A model achieving 95% accuracy on a 10-class problem is straightforwardly interpretable. In regression over a right-skewed target with no natural baseline, what "good performance" looks like is not obvious without fixing a metric first. A model achieving MdAPE = 21% might look poor next to a classifier achieving 95% accuracy, even though both could represent near-ceiling performance for their respective problems. The pre-registered predictions (Section 3.6) are stated in terms of MdAPE specifically so that the performance thresholds have a concrete, policy-grounded interpretation independent of the distribution's scale.
+
+---
+
+### 3.2 The 2×3 Factorial Design
+
+The experiment crosses two pipelines with three modelling approaches, giving six models.
+
+```
+                    Frequentist       ML                Bayesian
+                 ─────────────────────────────────────────────────────
+Causally-blind  │  M1  CB OLS      M2  CB XGB       M3  CB Bayes
+                │  no IPW          no IPW            no IPW
+                │  ALL features    ALL features      ALL features
+                │  all obs. rows   all obs. rows     all obs. rows
+                │  KFold           KFold tuned       PSIS-LOO
+                │
+Causal          │  M4  Causal OLS  M5  Causal XGB   M6  Causal Bayes
+                │  IPW             IPW               IPW
+                │  upstream only   upstream only     upstream only
+                │  compliant rows  compliant rows    compliant rows
+                │  GroupKFold      GroupKFold tuned  PSIS-LOO
+```
+
+The three modelling approaches — frequentist OLS, gradient-boosted trees (XGBoost), and hierarchical Bayes — are held constant within each column. The two pipelines vary across rows. Every difference between a CB model and its causal counterpart in the same column is, by construction, attributable to the pipeline: the feature set, the row selection rule, the cross-validation protocol, and the IPW correction. No other difference exists.
+
+This is a *realistic comparison* design, not a controlled one. Each pipeline receives the data exactly as its analyst would actually prepare it. The row counts therefore differ intentionally: the causally-blind pipeline trains on all 21,714 rows with an observed target, while the causal pipeline trains on 21,406 rows restricted to compliant buildings. The naive analyst uses more data and produces the wrong model. That asymmetry is itself a finding, not a confound.
+
+### 3.3 Four Intentional Differences Between Pipelines
+
+**Difference 1 — Feature set.** The causally-blind analyst opens the dataset, drops obvious non-predictors (identifiers, addresses, free-text fields, and the target itself), and uses everything remaining with reasonable coverage. The feature set `CB_ALL_FEATURES` contains:
+
+  - *Upstream characteristics*: floor area, property type, year built, number of buildings, data year.
+  - *Spatial metadata*: ZIP code, community area, latitude, longitude.
+  - *Compliance metadata*: reporting status, exempt-from-rating flag.
+  - *Energy mediators*: electricity, natural gas, district steam, district chilled water, other fuel (all in kBtu).
+  - *Derived energy metrics*: site EUI, source EUI, weather-normalised EUIs, GHG intensity per sq ft, Energy Star score, Chicago energy rating.
+  - *Water use*: water_use_kgal (partially observed).
+
+The causal analyst restricts to upstream characteristics only: floor area, property type, year built, number of buildings, and data year. The derived metrics are excluded because the verified DAG establishes they are deterministic downstream functions of the mediators. GHG intensity is computed as total_GHG / floor_area — including it as a predictor of total_GHG is not a modelling choice, it is a tautology. Energy Star score and Chicago energy rating are performance indices computed from fuel consumption data: the same data that produces the target. The causal analyst knows this because the EPA formula documentation is reviewed in Stage 2 of the TDGP pipeline. The naive analyst does not know it, includes all these columns, and hands the model a near-algebraic identity.
+
+**Difference 2 — Row subset.** The causally-blind analyst uses all 21,714 rows where the target is observed, with no filter on compliance status. They have no reason to apply such a filter — understanding the compliance gate requires the domain knowledge the naive analyst lacks. The causal analyst filters to the 21,406 compliant rows. The 308-row difference is small in absolute terms but conceptually large: the non-compliant rows in the CB training set are buildings that reported in some years but not others, and conditioning on their observed GHG without accounting for the selection rule introduces a subtle additional confound.
+
+**Difference 3 — Cross-validation protocol.** The causally-blind analyst applies standard KFold (k = 5, shuffled) because they do not know the data is a longitudinal panel: the same building appears in multiple years. Standard KFold can place the same building in both training and test folds, allowing the model to interpolate within a building's trajectory rather than generalise across buildings. This inflates CV metrics for any model that captures building-specific patterns. The causal analyst applies GroupKFold (k = 5) on building ID, guaranteeing that all observations from a given building are held out together. GroupKFold is conservative — it tests the harder question of whether the model generalises to buildings it has never seen.
+
+**Difference 4 — IPW correction.** The causally-blind analyst applies no reweighting. The causal analyst applies inverse probability weighting (IPW) to correct for the compliance gate. Buildings that voluntarily comply differ systematically from those that do not — they are typically larger, newer, and professionally managed. A model trained on compliant buildings without reweighting learns the GHG distribution of the compliant subset, not the full-stock distribution. IPW up-weights rare compliant buildings so that the reweighted sample reconstructs the full covariate distribution. Raw weights 1/ê(X) are trimmed at the 99th percentile and normalised to mean one; the maximum resulting weight is 1.32, so even the most underrepresented compliant building exerts only 32% more influence than average — a moderate correction. IPW corrects for selection on observed upstream characteristics only. Selection on unobservables — management quality, tenant behaviour, retrofit investment — remains uncorrected and is acknowledged as a limitation.
+
+A fifth difference applies to the Bayesian column only.
+
+**Difference 5 — Prior calibration (Bayesian column only).** M3 CB Bayes uses uninformative upstream slope priors Normal(0, 2.5) — the causally-blind analyst has no institutional basis for tighter priors — and Normal(0, 2.0) for mediator slopes, which are wide enough to allow the slopes to converge toward the EPA emission factors from the data. M6 Causal Bayes uses informative upstream slope priors Normal(0, 0.5), encoding the causal analyst's expectation — derived from the verified DAG and EPA formula — that log-scale elasticities lie within roughly ±1 unit. Both models share the same hierarchical intercept structure (ᾱ, σ_α, δ_j) and the same sigma priors. The prior difference reflects what each analyst would plausibly specify given their available domain knowledge.
+
+### 3.4 Preprocessing
+
+#### Shared steps (both pipelines)
+
+Both pipelines begin from the same raw 28,329-row dataset.
+
+**Step 1 — Compliance flag.** A building-year record is marked compliant if `reporting_status ∈ {Submitted, Submitted Data}` and `exempt_from_chicago_energy_rating = False`. This implements the ordinance definition: a building that submitted data and is not legally exempt from the rating system is compliant. All other records — non-reporters and legally exempt buildings — are marked non-compliant. The flag is applied before any filtering so that the propensity model can see both groups.
+
+**Step 2 — Upstream imputation.** Floor area, year built, and number of buildings are imputed with their global median computed on all 28,329 rows before any filtering. Property type nulls are replaced with "Unknown". Both pipelines use the same imputed values; the medians are computed once on the full dataset and applied identically. This is the one preprocessing step where a domain-agnostic choice is appropriate: upstream building characteristics are observed independently of compliance status, so there is no reason for the two pipelines to handle them differently.
+
+#### Causally-blind pipeline
+
+**Step 3 — Row filter.** Rows where the target is null are dropped. This retains 21,714 rows. No compliance filter is applied.
+
+**Step 4 — Feature imputation.** Mediator columns (fuel types), derived metric columns, and water use are filled with their column medians computed on the 21,714-row CB training set. This is the naive analyst's default: any missing value gets the typical observed value. The medians are stored in `cb_medians` and reused at deployment time, so that non-compliant buildings receive the same imputation the model was trained on — a consistent but causally unsound treatment.
+
+**Step 5 — CV splits.** KFold(k = 5, shuffle = True, random_state = SEED) is applied to all 21,714 rows.
+
+#### Causal pipeline
+
+**Step 3 — Row filter.** Rows are restricted to compliant records (compliant == 1) with an observed target. This retains 21,406 rows.
+
+**Step 4 — Mediator imputation.** Null fuel values are filled with structural zero. The verified DAG establishes that district steam, district chilled water, and other fuel nulls are structural absences — the building is physically not connected to the relevant energy network. Filling with zero is not an imputation assumption; it is a domain fact.
+
+**Step 5 — Propensity model.** A logistic regression is fitted on all 28,329 rows to estimate P(C = 1 | X_upstream), where X_upstream comprises the five upstream features one-hot encoded over 63 property types. The model achieves 95.1% accuracy. Propensity scores for the 21,406 causal training rows are extracted. Raw weights 1/ê(X) are trimmed at the 99th percentile and normalised to mean one. The maximum normalised weight is 1.32.
+
+**Step 6 — CV splits.** GroupKFold(k = 5) on building ID is applied to all 21,406 rows.
+
+### 3.5 Model Specifications
+
+#### M1 CB OLS and M4 Causal OLS
+
+Both OLS models minimise weighted squared error in log₁₊(GHG) space. M4 applies IPW weights; M1 does not. The design matrix for M1 is constructed from `CB_ALL_FEATURES`: numeric columns enter directly, and all string or boolean columns (property type, ZIP code, community area, reporting status, exempt flag) are one-hot encoded. The design matrix for M4 is constructed from `UPSTREAM_COLS`: numeric upstream features and one-hot property type. Both matrices include an intercept column. Coefficients are estimated via closed-form least squares. M4 uses weighted least squares:
+
+    β̂_WLS = (X^T W X)^{-1} X^T W y
+
+where W = diag(w₁, ..., wₙ) and wᵢ is the normalised IPW weight for observation i. The full-data refit (used for deployment) is deterministic. No hyperparameters.
+
+#### M2 CB XGB and M5 Causal XGB
+
+Both XGBoost models use nested cross-validation. In the inner loop, Optuna TPE (60 trials per fold, seed = SEED + k) searches over learning rate, tree depth, subsampling, column sampling, regularisation, and minimum child weight. The outer fold uses the best inner hyperparameters and fits with n_jobs = 1 for deterministic floating-point accumulation. A full-data refit on the median-selected hyperparameter configuration produces the deployed model. M2 uses KFold splits and no IPW; M5 uses GroupKFold splits and applies IPW via sample weights passed to the XGBoost `fit()` call. Feature encoding is label encoding of string columns and boolean-to-integer coercion; numeric columns are median-filled within the training fold.
+
+#### M3 CB Bayes and M6 Causal Bayes (McElreath notation)
+
+Both models are hierarchical Normal regressions in log₁₊(GHG) space. The generative model is:
+
+**M6 Causal Bayes** (upstream features, IPW correction, compliant rows):
+
+```
+y_i     ~ Normal(μ_i, σ)                            [likelihood]
+μ_i      = α_{type[i]} + β_A · ã_i + β_B · b̃_i
+           + β_T · t̃_i + β_Y · ỹ_i                [linear predictor]
+α_j      = ᾱ + δ_j · σ_α                           [non-centred intercept]
+δ_j     ~ Normal(0, 1),    j = 1,...,55             [offset; 55 of 63
+                                                      property types appear
+                                                      in the compliant
+                                                      training set]
+ᾱ       ~ Normal(7.0, 1.0)                          [global intercept;
+                                                      exp(7) ≈ 1,097 t CO₂e,
+                                                      close to observed median]
+σ_α     ~ HalfNormal(1.0)                           [type-level SD]
+β_A     ~ Normal(0, 0.5)                            [log floor area slope]
+β_B     ~ Normal(0, 0.5)                            [log num. buildings slope]
+β_T     ~ Normal(0, 0.5)                            [data year slope]
+β_Y     ~ Normal(0, 0.5)                            [year built slope]
+σ       ~ HalfNormal(0.5)                           [observation SD]
+```
+
+Covariates are standardised before entry. Log floor area and log number of buildings are mean-centred; data year and year built are standardised to unit variance. IPW enters via a likelihood potential:
+
+```
+log p*(θ | data) = log p(θ | data) + Σᵢ (wᵢ - 1) · log p(yᵢ | μᵢ, σ)
+```
+
+which up-weights the log-likelihood contribution of underrepresented buildings proportionally to their normalised IPW weight. This is equivalent to fractional importance sampling on the posterior.
+
+**M3 CB Bayes** (upstream + mediator features, no IPW, all observed rows):
+
+M3 shares the identical hierarchical intercept structure (ᾱ, σ_α, δ_j) and
+the same linear predictor form. It adds five mediator slopes and uses wider
+upstream slope priors that reflect the causally-blind analyst's absence of
+physical prior knowledge:
+
+```
+μ_i  = α_{type[i]} + β_A · ã_i + β_B · b̃_i + β_T · t̃_i + β_Y · ỹ_i
+       + β_E · ẽ_i + β_G · g̃_i + β_S · s̃_i
+       + β_W · w̃_i + β_O · õ_i                    [+ mediator terms]
+
+β_A, β_B, β_T, β_Y ~ Normal(0, 2.5)               [upstream slopes;
+                                                      uninformative — CB
+                                                      analyst has no prior
+                                                      knowledge of elasticities]
+β_f ~ Normal(0, 2.0),  f ∈ {E, G, S, W, O}         [fuel slopes;
+                                                      wider prior allows
+                                                      recovery of EPA
+                                                      emission factors]
+```
+
+where E, G, S, W, O denote electricity, natural gas, district steam, district chilled water, and other fuel, each standardised to zero mean and unit variance within the training set. No IPW. The derived metrics, spatial columns, and compliance metadata in `CB_ALL_FEATURES` are *not* given explicit slope parameters — the parametric generative structure cannot accommodate them without becoming misspecified. M3 therefore occupies an intermediate position: it trains on the larger 21,714-row CB dataset but its generative model uses only upstream features and mediators.
+
+Both models are sampled with 4 chains, 3,000 tune steps, and 3,000 draw iterations (12,000 post-warmup samples total). Initialisation uses `jitter+adapt_diag`; target acceptance rate is 0.95. Convergence is assessed by R̂ < 1.01 and ESS > 400 for all structural parameters. Predictive performance is evaluated via PSIS-LOO.
+
+### 3.6 Pre-Registered Performance Predictions
+
+The following predictions are derived from the structure of the design, the preprocessing decisions, and the mathematical properties of each model. They are stated before examining any results, and could in principle be falsified.
+
+**P1 — M2 CB XGB will achieve near-perfect CV metrics.** `CB_ALL_FEATURES` includes `ghg_intensity_kg_co2e_sq_ft`, which is defined as total_GHG / floor_area. Floor area is also in the feature set. XGBoost is a universal function approximator that will discover the near-identity ghg_intensity × floor_area ≈ total_GHG without being told to. We predict R² > 0.97 and MdAPE < 5% for M2. This result is not a demonstration of predictive power; it is a demonstration of tautological feature selection.
+
+**P2 — M5 Causal XGB will define the honest performance ceiling.** With upstream features only and GroupKFold preventing within-building leakage, M5 represents the best achievable out-of-sample performance on causally legitimate predictors. We predict R² ≈ 0.80–0.87 and MdAPE ≈ 20–25%. The true ceiling is lower than M2's score, and that gap is the empirical measure of how much M2's performance is fictitious.
+
+**P3 — M4 Causal OLS will underperform M5 substantially.** OLS imposes a linear form on relationships that are not linear: the GHG–floor area relationship flattens for very large buildings and steepens for small ones; property type heterogeneity produces multimodal residual distributions that a single set of linear coefficients cannot capture. We predict M4's R² will be substantially below M5's — roughly 0.40–0.60 — and that MdAPE will be highest among all six models, around 35–45%. The RMSE variance across folds will be large because GroupKFold exposes OLS to building clusters it cannot linearly extrapolate to.
+
+**P4 — M3 CB Bayes will perform similarly to the causal models in CV, but for the wrong reason.** M3's parametric structure only explicitly models upstream features and mediators — the derived metrics, spatial, and compliance columns in CB_ALL_FEATURES do not enter the generative model as parameters. The wider Normal(0, 2.0) priors on mediator slopes should allow those slopes to converge toward the EPA emission factors, giving M3 a similar R² and MdAPE to M5 and M6. However, this similarity conceals a structural difference: M3 trains on 21,714 rows including non-compliant buildings, does not apply IPW, and uses KFold rather than GroupKFold. The apparent parity with the causal models in CV does not imply parity in deployment.
+
+**P5 — M6 Causal Bayes will match M5 Causal XGB within 1–2 percentage points on MdAPE.** With only five upstream features, the modelling complexity is low enough that the Bayesian parametric structure and XGBoost's nonlinear approximation converge to similar predictive performance. The hierarchical pooling across property types in M6 may help for rare types with few observations, giving it a slight edge on the PSIS-LOO ELPD even if raw MdAPE is similar.
+
+**P6 — The IPW effect on MdAPE will be positive for all three approach pairs, but largest for ML.** Positive Delta MdAPE means the causal model has higher error than its CB counterpart. This is expected and correct: higher CB CV performance reflects exploitation of circular features, not better generalisation. The ML pair (M5 vs M2) will show the largest gap because M2's near-identity exploitation drives its MdAPE toward zero while M5 faces the honest ~20% floor. The Frequentist pair (M4 vs M1) will show a moderate gap because OLS can exploit ghg_intensity linearly but less efficiently than XGBoost. The Bayesian pair (M3 vs M6) will show the smallest gap because M3's parametric structure does not directly incorporate the circular derived features.
+
+**P7 — The deployment test will cleanly separate the two pipelines.** Non-compliant buildings have never submitted a report, so their mediators and derived metrics are null at deployment. CB models receive median-imputed values for these columns — the same imputation applied during training. This is consistent but causally invalid: the imputed values reflect the typical energy behaviour of a *compliant* building, not of this specific non-compliant building whose actual energy use is unknown. We predict:
+
+  - M2 CB XGB will predict roughly (median_ghg_intensity × floor_area) for each non-compliant building — a non-zero but systematically miscalibrated result. The distribution will be narrower than the causal models because ghg_intensity variation has been collapsed to a single imputed value; only floor area varies.
+
+  - M1 CB OLS will show a wider deployment distribution with a heavy right tail. OLS extrapolates linearly beyond the training support; buildings with upstream characteristics that differ from the compliant training distribution will receive extreme predictions. The median is a more honest summary than the mean.
+
+  - M3 CB Bayes will produce deployment predictions closer in magnitude to the causal models than M1 or M2, because its parametric structure anchors predictions to the upstream intercepts. This similarity is deceptive: the model is not reasoning causally. It is stable by accident of parameterisation, not by design.
+
+  - M4, M5, M6 will produce stable, consistent predictions anchored to the upstream feature distribution of non-compliant buildings. Because non-compliant buildings tend to be smaller and older than compliant ones, the causal deployment medians may sit slightly below the observed compliant median of ≈ 1,018 metric tons, but should remain in the same order of magnitude. These predictions are deployable; the CB predictions are not.
+
+**P8 — M4 Causal OLS will show erratic deployment behaviour.** OLS extrapolation outside the training support is unconstrained. A minority of non-compliant buildings with extreme floor area or unusual property types will receive predictions that are orders of magnitude too large, inflating the mean far above the median. The log-scale clip at 15 (≈ 3.3M metric tons) prevents numerical overflow but cannot prevent the fundamental extrapolation problem.
+
+Predictions P1, P2, P5, P6, P7, and P8 follow directly from the mathematical structure of the models and the imputation design; they should hold unless an implementation error exists. Prediction P3 rests additionally on the assumption that upstream features alone carry insufficient signal to eliminate OLS's structural limitations. Prediction P4 depends on whether the CB dataset's extra 308 non-compliant rows meaningfully shift M3's posterior — they may not, given that the propensity model shows compliance is highly predictable from observed features, implying the extra rows do not carry much new information.

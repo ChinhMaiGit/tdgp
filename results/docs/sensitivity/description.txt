@@ -1,0 +1,117 @@
+sensitivity/
+============
+Purpose
+-------
+This folder contains the sensitivity analysis for M6 Causal Bayes — the
+structural model in the 2x3 factorial experiment.
+
+Sensitivity analysis tests whether the paper's key findings are robust to
+two independent dimensions of analyst choice: the prior specification and
+the IPW trim cap. Parameters of interest and comparison procedure are
+stated before fitting any alternative model, so that the analysis cannot
+be accused of post-hoc selection of favourable specifications.
+
+All new fits use the exact M6 sampling specification:
+  draws=3000, tune=3000, chains=4, cores=4,
+  target_accept=0.95, init="jitter+adapt_diag",
+  random_seed=[20, 21, 22, 23]
+
+The base specification (slope sigma=0.50, scale sigma=1.00, IPW 99th pct)
+is loaded from inference/m6_trace.nc — the trace saved by the experiment —
+and is not re-sampled. This guarantees bit-for-bit consistency with the
+experiment results.
+
+
+Design
+------
+Two sensitivity dimensions, each with three specifications:
+
+  Sensitivity 1 — Prior specification  (IPW fixed at 99th-pct cap)
+  ──────────────────────────────────────────────────────────────────
+  Tight : beta slopes ~ Normal(0, 0.25), sigma_alpha ~ HalfNormal(0.50),
+          sigma ~ HalfNormal(0.50)
+  Base  : beta slopes ~ Normal(0, 0.50), sigma_alpha ~ HalfNormal(1.00),
+          sigma ~ HalfNormal(1.00)  <- sensitivity base (loaded from trace)
+  Wide  : beta slopes ~ Normal(0, 1.00), sigma_alpha ~ HalfNormal(2.00),
+          sigma ~ HalfNormal(2.00)
+
+  Note: M6's actual sigma prior is HalfNormal(0.50) and sigma_alpha prior
+  is HalfNormal(1.00). The sensitivity analysis varies both scale parameters
+  together (using a single prior_scale_sigma). The base case is always loaded
+  from the M6 trace directly — the "base" scale prior value of 1.00 affects
+  only the tight/wide alternative fits, not the base posterior. Since sigma
+  is essentially unchanged across all specs (posterior mean 0.430 ± 0.001),
+  this choice has no effect on the conclusions.
+          <- M6 experiment spec (loaded from trace, not re-fitted)
+
+  The alpha_bar prior is always Normal(7.0, 1.0) — fixed and not varied,
+  as it is motivated by the observed log-GHG mean (7.08) rather than an
+  analyst choice.
+
+  Sensitivity 2 — IPW trim cap  (priors fixed at base spec)
+  ──────────────────────────────────────────────────────────
+  Aggressive : 95th-percentile cap on raw weights 1/p(compliant)
+  Base       : 99th-percentile cap  <- M6 experiment spec
+  Lenient    : 99.9th-percentile cap
+
+  The 99th-percentile baseline follows Cole & Hernán (2008). More
+  aggressive trimming reduces variance but introduces bias; more lenient
+  trimming preserves unbiasedness at the cost of high-variance extreme
+  weights.
+
+
+Parameters of interest
+----------------------
+  beta_A      — floor area elasticity (primary causal driver)
+  beta_T      — data-year trend (decarbonisation signal)
+  sigma_alpha — between-type heterogeneity (hierarchical structure)
+  sigma       — residual SD (irreducible predictive uncertainty)
+
+These four parameters correspond directly to the paper's empirical claims.
+beta_B and beta_Y are not reported in the sensitivity tables because they
+are auxiliary controls rather than central claims.
+
+
+Contents
+--------
+scripts/sensitivity.py
+    Main sensitivity script. Steps:
+    1  Fetch data (Socrata API, same as experiment)
+    2  Preprocess (causal pipeline)
+    3  Build IPW weight arrays at 95th, 99th, 99.9th pct caps
+    4  Load M6 base trace from inference/m6_trace.nc
+    5  Fit 4 sensitivity models (tight prior, wide prior, IPW-95, IPW-99.9)
+    6  MCMC diagnostics table for all 5 specifications
+    7  Parameter comparison tables (prior sensitivity + IPW sensitivity)
+    8  Forest plot (fig_sensitivity_forest.png)
+
+    Run: uv run python sensitivity/scripts/sensitivity.py
+
+
+figures/
+    fig_sensitivity_forest.png
+        Two-panel forest plot showing posterior means and 89% PIs for
+        beta_A, beta_T, sigma_alpha, and sigma across all specifications.
+        Left panel: prior sensitivity (3 specs, IPW fixed).
+        Right panel: IPW sensitivity (3 specs, prior fixed).
+        Markers stacked = robust; markers spread = sensitive.
+
+
+docs/
+    description.txt  — this file
+    results.txt      — console output from running sensitivity.py
+                       (fill in after running the script)
+
+
+Relationship to the experiment and inference
+--------------------------------------------
+experiments/  — establishes M6's role; CV metrics are reported there.
+inference/    — full posterior analysis of M6 (diagnostics, parameters,
+                deployment). Saves m6_trace.nc which this script loads.
+sensitivity/  — robustness checks confirming that the findings reported
+                in inference/ are not artefacts of prior or IPW choices.
+
+The three folders form a complete validation chain for M6:
+  experiment  -> what M6 achieves relative to alternatives
+  inference   -> what M6 has learned about the DGP
+  sensitivity -> that what M6 learned does not depend on analyst choices

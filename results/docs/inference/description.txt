@@ -1,0 +1,105 @@
+inference/
+==========
+Purpose
+-------
+This folder contains full Bayesian inference and diagnostics for M6 Causal
+Bayes — the structural model in the 2x3 factorial experiment.
+
+The experiment (experiments/) establishes M6's cross-validation performance
+(R² = 0.838, MdAPE = 21.4%, ELPD = -12,316) and its role as the causal
+structural ceiling. This folder goes deeper: it takes the same fitted model
+and runs a comprehensive posterior analysis covering MCMC health, predictive
+calibration, parameter interpretation, and deployment inference.
+
+All preprocessing and feature definitions are imported verbatim from
+experiments/scripts/pipeline.py. The model is fitted with the exact same
+specification (seed, draws, tune, chains, target_accept) so results are
+directly comparable to the experiment.
+
+
+Contents
+--------
+scripts/m6_inference.py
+    The main inference script. Runs 7 steps:
+
+    1  Fetch data         — Socrata API (same as experiment)
+    2  Preprocess         — causal pipeline only (~21,406 rows)
+    3  Fit M6             — exact experiment spec (3,000 draws, 3,000 tune,
+                            4 chains, target_accept=0.95, SEED=20)
+    4  MCMC diagnostics   — trace plots, energy plot, R-hat/ESS bar charts
+    5  Model evaluation   — PSIS-LOO Pareto-k, posterior predictive checks,
+                            LOO probability integral transform (calibration)
+    6  Parameter inference — global coefficient forest plot with 89% PI and
+                             back-transformed interpretations; full 63-type
+                             property-type intercept forest plot, ranked
+                             (55 types represented in compliant training set)
+    7  Deployment         — posterior predictive for 5,510 non-compliant
+                            buildings (structural zeros, verified DAG);
+                            overall distribution + per-type breakdown
+
+    Run: uv run python inference/scripts/m6_inference.py
+
+
+figures/
+    Output directory for all inference figures:
+
+    fig_trace.png           MCMC trace + marginals for 7 scalar parameters.
+                            Checks mixing and convergence visually.
+
+    fig_energy.png          Energy plot (E-BFMI). Detects divergence geometry
+                            and poor adaptation of the NUTS step size.
+
+    fig_rhat_ess.png        R-hat and ESS bar charts for scalar parameters.
+                            Thresholds: R-hat < 1.01, ESS > 400.
+
+    fig_pareto_k.png        PSIS-LOO Pareto-k per observation. k > 0.7
+                            indicates observations that strongly influence
+                            the posterior and where LOO is unreliable.
+
+    fig_ppc.png             Posterior predictive check: 200 simulated datasets
+                            overlaid on observed data on both log and original
+                            (log-axis) scales. Checks distributional fit.
+
+    fig_loo_pit.png         LOO probability integral transform. Uniform PIT
+                            distribution indicates calibrated predictive
+                            intervals — the model assigns the right probability
+                            to the right regions.
+
+    fig_coef_forest.png     Forest plot of all 7 global parameter posteriors
+                            with 89% PI and plain-English interpretations
+                            (e.g., "doubling floor area -> x1.97 GHG").
+
+    fig_type_intercepts.png Full 55-type ranked forest plot of property-type
+                            intercepts alpha_j = alpha_bar + delta_j * sigma_alpha.
+                            Shows which building categories have systematically
+                            higher or lower GHG after controlling for size,
+                            age, and data year. Dashed line = global mean ā.
+                            (55 of the 63 ordinance-defined property types are
+                            represented in the compliant training set.)
+
+    fig_deployment.png      Two-panel deployment inference:
+                            Left  — overall distribution of M6 deployment
+                                    predictions vs observed compliant buildings.
+                            Right — per-type median deployment prediction for
+                                    the 12 most common non-compliant types.
+
+
+docs/
+    description.txt    — this file
+    results.txt        — console output from running m6_inference.py
+                         (fill in after running the script)
+
+
+Relationship to the experiment and diagnostic
+---------------------------------------------
+experiments/   — establishes M6's role in the 2x3 factorial comparison.
+                 CV metrics (MdAPE, R², ELPD) are reported there.
+diagnostic/    — probes M2 CB XGB to explain its near-perfect CV performance
+                 via SHAP attribution. The diagnostic is about why M2 is wrong.
+inference/     — probes M6 to understand what it has actually learned.
+                 The inference is about what the correct model says.
+
+These three folders form a layered analysis:
+  experiment  -> what the models achieve
+  diagnostic  -> why the causally-blind model's achievement is fictitious
+  inference   -> what the structural model tells us about the real DGP

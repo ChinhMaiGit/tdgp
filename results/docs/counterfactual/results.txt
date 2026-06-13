@@ -1,0 +1,117 @@
+PS D:\projects\1stArxivPaper> uv run python counterfactual/scripts/counterfactual.py
+======================================================================
+STEP 1 -- FETCHING DATA
+======================================================================
+Fetching Chicago Energy Benchmarking data ...
+  50,000 records ...
+  Total records: 28,329
+
+
+======================================================================
+STEP 2 -- PREPROCESSING
+======================================================================
+Building compliance flag ...
+Imputing upstream features (shared, global median) ...
+
+  Causally-blind row set   : 21,714 rows (all rows with observed target)
+Filling CB features with column medians (naive analyst default) ...
+  Causal row set           : 21,406 rows (compliant + observed target)
+
+  Row count difference     : 308 rows — naive analyst uses more data and still gets the wrong answer.
+Applying structural zeros for causal pipeline (verified DAG) ...
+Fitting propensity model on full dataset ...
+  Propensity model accuracy : 0.951
+  IPW 99th-pct cap     : 1.382
+  IPW max (normalised) : 1.322
+
+  Non-compliant (deployment test) : 5,510 rows
+
+  Alignment verified:
+    CB pipeline    : 21,714 rows (target, log-target, bids)
+    Causal pipeline: 21,406 rows (target, log-target, bids, IPW)
+  Causal training rows : 21,406
+
+======================================================================
+STEP 3 -- LOADING M6 TRACE
+  Source : D:\projects\1stArxivPaper\inference\m6_trace.nc
+======================================================================
+  Loaded : 4 chains x 3000 draws
+
+======================================================================
+STEP 4 -- RECONSTRUCTING FEATURE ARRAYS
+======================================================================
+  year_data  : mean=2019.10  std=2.590
+  year_built : mean=1964.29  std=37.418
+  Posterior draws : 12,000
+
+======================================================================
+OUTPUT 4 -- DECARBONISATION PACE AND POLICY GAP
+======================================================================
+  beta_T (standardised)     : -0.1447  [-0.1495, -0.1399]
+  year_data std             : 2.590 years
+  Annual rate (log scale)   : -0.0559/yr  [-0.0577, -0.0540]
+  Annual rate (% GHG change): -5.43%/yr  [-5.61%, -5.26%]
+  At current pace, 80% reduction by: ~2052
+  Chicago net-zero target   : 2040
+  Required annual rate      : -23.73%/yr  (gap = -0.2150 log/yr)
+  *** Current pace is INSUFFICIENT for net-zero by 2040 ***
+    Saved -> D:\projects\1stArxivPaper\counterfactual\figures\fig_trend.png
+
+======================================================================
+OUTPUT 5a -- COUNTERFACTUAL 1: do(data_year = 2030)
+======================================================================
+  Compliance threshold (25th pct)  : 546 metric tons CO2e
+  Counterfactual year              : 2030
+  -----------------------------------------------------
+  On-track    P(compliant) > 0.8   : 7,586  (35.4%)
+  Uncertain   P(compliant) 0.2-0.8 : 5,887  (27.5%)
+  High-risk   P(compliant) < 0.2   : 7,933  (37.1%)
+  Median P(compliant) across all   : 0.526
+    Saved -> D:\projects\1stArxivPaper\counterfactual\figures\fig_cf1_compliance.png
+
+======================================================================
+OUTPUT 5b -- COUNTERFACTUAL 2: do(year_built = 2010)
+======================================================================
+  Counterfactual year_built        : 2010
+  Actual mean year_built           : 1964.3
+  -----------------------------------------------------
+  GHG 'reduction' median           :        -48 metric tons CO2e
+  GHG 'reduction' mean             :       -115 metric tons CO2e
+  Median 89% CI                    : [-53,  -42]
+  -----------------------------------------------------
+  Credible reduction (CI excludes zero, pos): 1,875  (8.8%)
+  Credible increase  (CI excludes zero, neg): 19,315  (90.2%)
+  No credible effect (CI includes zero)     : 216  (1.0%)
+
+  *** Counterintuitive result: 'newer vintage' predicts HIGHER GHG. ***
+  This is a methodological finding -- beta_Y captures cross-sectional
+  use-intensity differences, not retrofit impact. See analysis.txt.
+    Saved -> D:\projects\1stArxivPaper\counterfactual\figures\fig_cf2_reduction.png
+
+======================================================================
+COUNTERFACTUAL SUMMARY  --  M6 CAUSAL BAYES
+======================================================================
+
+  Output 4 -- Decarbonisation pace
+    beta_T (std scale)  : -0.1447  [-0.1495, -0.1399]
+    Annual rate         : -5.43%/yr  [-5.61%, -5.26%]
+    80% reduction by    : ~2052
+    Required for 2040   : -23.73%/yr
+    Policy gap          : -0.2150 log/yr
+
+  Output 5a -- CF1: do(data_year = 2030)
+    Threshold (25th pct): 546 metric tons CO2e
+    On-track  (P > 0.8) : 7,586  (35.4%)
+    Uncertain (0.2-0.8) : 5,887  (27.5%)
+    High-risk (P < 0.2) : 7,933  (37.1%)
+    Median P(compliant) : 0.526
+
+  Output 5b -- CF2: do(year_built = 2010)
+    Median GHG delta    : -48 metric tons CO2e
+    Mean GHG delta      : -115 metric tons CO2e
+    Median 89% CI       : [-53,  -42]
+    Credible reduction  : 1,875  (8.8%)
+    Credible increase   : 19,315  (90.2%)
+
+  Figures saved to: D:\projects\1stArxivPaper\counterfactual\figures
+======================================================================

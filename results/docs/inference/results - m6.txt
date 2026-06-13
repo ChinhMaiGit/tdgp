@@ -1,0 +1,166 @@
+PS D:\projects\1stArxivPaper> uv run python inference/scripts/m6_inference.py
+======================================================================
+STEP 1 -- FETCHING DATA
+======================================================================
+Fetching Chicago Energy Benchmarking data ...
+  50,000 records ...
+  Total records: 28,329
+
+
+======================================================================
+STEP 2 -- PREPROCESSING  (causal pipeline)
+======================================================================
+Building compliance flag ...
+Imputing upstream features (shared, global median) ...
+
+  Causally-blind row set   : 21,714 rows (all rows with observed target)
+Filling CB features with column medians (naive analyst default) ...
+  Causal row set           : 21,406 rows (compliant + observed target)
+
+  Row count difference     : 308 rows — naive analyst uses more data and still gets the wrong answer.
+Applying structural zeros for causal pipeline (verified DAG) ...
+Fitting propensity model on full dataset ...
+  Propensity model accuracy : 0.951
+  IPW 99th-pct cap     : 1.382
+  IPW max (normalised) : 1.322
+
+  Non-compliant (deployment test) : 5,510 rows
+
+  Alignment verified:
+    CB pipeline    : 21,714 rows (target, log-target, bids)
+    Causal pipeline: 21,406 rows (target, log-target, bids, IPW)
+  Causal training rows : 21,406
+  Non-compliant rows   : 5,510
+
+======================================================================
+STEP 3 -- LOADING M6 TRACE  (saved by experiment)
+  Source : D:\projects\1stArxivPaper\inference\m6_trace.nc
+======================================================================
+  Loaded : 4 chains × 3000 draws
+  PPD    : False
+  log_lik: False
+
+======================================================================
+STEP 4 -- MCMC DIAGNOSTICS
+======================================================================
+  R-hat max (scalar params) : 1.0095
+  R-hat max (type alphas)   : 1.0016
+  R-hat max (overall)       : 1.0095
+  ESS min  (scalar params)  : 526
+  ESS min  (type alphas)    : 11,409
+  ESS min  (overall)        : 526
+  Divergent transitions     : 0
+
+  Generating figures ...
+    Saved -> D:\projects\1stArxivPaper\inference\figures\fig_trace.png
+    Saved -> D:\projects\1stArxivPaper\inference\figures\fig_energy.png
+    Saved -> D:\projects\1stArxivPaper\inference\figures\fig_rhat_ess.png
+
+======================================================================
+STEP 5 -- PSIS-LOO AND POSTERIOR PREDICTIVE CHECKS
+======================================================================
+  ELPD (PSIS-LOO)  : -12,316  (SE = 317.4)
+  Pareto-k > 0.7   : 1 / 21406
+  Pareto-k > 0.5   : 7 / 21406
+  Pareto-k median  : -0.060
+    Saved -> D:\projects\1stArxivPaper\inference\figures\fig_pareto_k.png
+    Saved -> D:\projects\1stArxivPaper\inference\figures\fig_ppc.png
+    Saved -> D:\projects\1stArxivPaper\inference\figures\fig_loo_pit.png
+
+======================================================================
+STEP 6 -- PARAMETER INFERENCE
+======================================================================
+  Scalar parameter posteriors (mean, 89% PI):
+  alpha_bar          mean = +7.4087  89% PI = [+7.3037, +7.5151]
+  sigma_alpha        mean = +0.4828  89% PI = [+0.4090, +0.5681]
+  beta_A             mean = +0.9788  89% PI = [+0.9727, +0.9850]
+  beta_B             mean = +0.0141  89% PI = [+0.0022, +0.0259]
+  beta_T             mean = -0.1447  89% PI = [-0.1495, -0.1399]
+  beta_Y             mean = +0.0467  89% PI = [+0.0416, +0.0518]
+  sigma              mean = +0.4303  89% PI = [+0.4270, +0.4337]
+
+  Implied mean GHG at mean feature values:
+    exp(alpha_bar) - 1 = 1,649 metric tons CO2e
+  Floor-area elasticity:
+    doubling floor area -> x1.971 GHG  (beta_A = 0.979)
+    Saved -> D:\projects\1stArxivPaper\inference\figures\fig_coef_forest.png
+
+  Computing per-type intercepts ...
+  Top 3 property types by posterior mean intercept:
+    Data Center                                        alpha_j = 9.352  [9.189, 9.515]
+    Laboratory                                         alpha_j = 8.386  [8.336, 8.437]
+    Supermarket/Grocery Store                          alpha_j = 8.286  [8.250, 8.322]
+  Bottom 3:
+    Repair Services (Vehicle, Shoe, Locksmith, etc.)   alpha_j = 6.234  [6.015, 6.452]
+    Distribution Center                                alpha_j = 6.772  [6.355, 7.182]
+    Other - Education                                  alpha_j = 6.793  [6.610, 6.979]
+    Saved -> D:\projects\1stArxivPaper\inference\figures\fig_type_intercepts.png
+
+======================================================================
+STEP 7 -- DEPLOYMENT INFERENCE
+  Non-compliant buildings : 5,510
+  Mediators               : structural zeros (verified DAG)
+======================================================================
+Sampling: [y_hat]
+  Deployment median      : 1,043 metric tons CO2e
+  Deployment mean        : 1,323 metric tons CO2e
+  Median 89% PI          : [495, 2,103]
+  Observed compliant med : 1,018 metric tons CO2e
+
+  Per-type deployment medians (top 12 types by count):
+    Unknown                                          n=3924  median=   1,021 t
+    K-12 School                                      n= 387  median=     676 t
+    Residential                                      n= 327  median=   1,048 t
+    Multifamily Housing                              n= 154  median=     893 t
+    Commercial                                       n= 133  median=   1,050 t
+    Mixed Use Property                               n= 131  median=   2,117 t
+    Office                                           n= 119  median=   1,298 t
+    College/University                               n=  49  median=   1,360 t
+    Retail Store                                     n=  30  median=     849 t
+    Other - Recreation                               n=  30  median=     845 t
+    Other                                            n=  21  median=     851 t
+    Hotel                                            n=  18  median=   1,096 t
+    Saved -> D:\projects\1stArxivPaper\inference\figures\fig_deployment.png
+
+======================================================================
+INFERENCE SUMMARY  —  M6 CAUSAL BAYES
+======================================================================
+  Training rows          : 21,406
+  Property types         : 55
+  ELPD (PSIS-LOO)        : -12,316  (SE = 317.4)
+  R-hat max (overall)    : 1.0095
+  ESS min  (overall)     : 526
+  Divergent transitions  : 0
+  Pareto-k > 0.7         : 1
+
+  Global parameters (posterior mean  +  89% PI):
+    alpha_bar          +7.4087  [+7.3037, +7.5151]
+    sigma_alpha        +0.4828  [+0.4090, +0.5681]
+    beta_A             +0.9788  [+0.9727, +0.9850]
+    beta_B             +0.0141  [+0.0022, +0.0259]
+    beta_T             -0.1447  [-0.1495, -0.1399]
+    beta_Y             +0.0467  [+0.0416, +0.0518]
+    sigma              +0.4303  [+0.4270, +0.4337]
+
+  Implied mean GHG at mean building:
+    exp(alpha_bar) - 1  =  1,649 metric tons CO2e
+  Floor-area elasticity:
+    doubling floor area -> x1.971 GHG  (beta_A = 0.979)
+
+  Property-type intercepts (top 3 and bottom 3 by posterior mean):
+    Data Center                                        +9.352  [+9.189, +9.515]
+    Laboratory                                         +8.386  [+8.336, +8.437]
+    Supermarket/Grocery Store                          +8.286  [+8.250, +8.322]
+    ...
+    Repair Services (Vehicle, Shoe, Locksmith, etc.)   +6.234  [+6.015, +6.452]
+    Distribution Center                                +6.772  [+6.355, +7.182]
+    Other - Education                                  +6.793  [+6.610, +6.979]
+
+  Deployment predictions (non-compliant buildings):
+    Median             : 1,043 metric tons CO2e
+    Mean               : 1,323 metric tons CO2e
+    Median 89% PI      : [495,  2,103]
+    Compliant median   : 1,018 metric tons CO2e  (reference)
+
+  Figures saved to: D:\projects\1stArxivPaper\inference\figures
+======================================================================

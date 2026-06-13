@@ -1,0 +1,119 @@
+PS D:\projects\1stArxivPaper> uv run python diagnostic/scripts/m2_shap.py
+======================================================================
+STEP 1 -- FETCHING DATA
+======================================================================
+Fetching Chicago Energy Benchmarking data ...
+  50,000 records ...
+  Total records: 28,329
+
+
+======================================================================
+STEP 2 -- PREPROCESSING  (CB pipeline)
+======================================================================
+Building compliance flag ...
+Imputing upstream features (shared, global median) ...
+
+  Causally-blind row set   : 21,714 rows (all rows with observed target)
+Filling CB features with column medians (naive analyst default) ...
+  Causal row set           : 21,406 rows (compliant + observed target)
+
+  Row count difference     : 308 rows — naive analyst uses more data and still gets the wrong answer.
+Applying structural zeros for causal pipeline (verified DAG) ...
+Fitting propensity model on full dataset ...
+  Propensity model accuracy : 0.951
+  IPW 99th-pct cap     : 1.382
+  IPW max (normalised) : 1.322
+
+  Non-compliant (deployment test) : 5,510 rows
+
+  Alignment verified:
+    CB pipeline    : 21,714 rows (target, log-target, bids)
+    Causal pipeline: 21,406 rows (target, log-target, bids, IPW)
+
+======================================================================
+STEP 3 -- BUILDING FEATURE MATRIX  (CB_ALL_FEATURES)
+======================================================================
+  Training rows : 21,714
+  Features      : 24
+  Circular derived features present:
+    site_eui_kbtu_sq_ft
+    source_eui_kbtu_sq_ft
+    weather_normalized_site_eui_kbtu_sq_ft
+    weather_normalized_source_eui_kbtu_sq_ft
+    ghg_intensity_kg_co2e_sq_ft
+    energy_star_score
+    chicago_energy_rating
+
+======================================================================
+STEP 4 -- FITTING M2 CB XGB  (full CB dataset, fixed params)
+======================================================================
+  Train R²(log) : 0.9991  (high R² confirms circular feature exploitation)
+  Train MdAPE   : 1.64%
+
+======================================================================
+STEP 5 -- COMPUTING SHAP VALUES
+======================================================================
+  Building TreeExplainer ...
+  Computing SHAP values (may take 1–2 minutes) ...
+
+  Feature group attribution (% of total mean |SHAP|):
+  Group                   Mean |SHAP|        %
+  ────────────────────────────────────────────
+  mediator                     0.6593    57.2%
+  upstream                     0.3012    26.1%
+  derived_circular             0.1733    15.0%
+  compliance                   0.0111     1.0%
+  spatial                      0.0067     0.6%
+  water                        0.0003     0.0%
+
+  Top 15 features:
+  Feature                                                  %  Group
+  ────────────────────────────────────────────────────────────────────────────────
+  electricity_use_kbtu                                 42.3%  mediator
+  gross_floor_area_buildings_sq_ft                     20.3%  upstream
+  natural_gas_use_kbtu                                 13.4%  mediator
+  ghg_intensity_kg_co2e_sq_ft                           9.3%  derived_circular
+  data_year                                             5.2%  upstream
+  source_eui_kbtu_sq_ft                                 2.6%  derived_circular
+  site_eui_kbtu_sq_ft                                   1.5%  derived_circular
+  district_steam_use_kbtu                               1.0%  mediator
+  weather_normalized_site_eui_kbtu_sq_ft                1.0%  derived_circular
+  exempt_from_chicago_energy_rating                     0.8%  compliance
+  district_chilled_water_use_kbtu                       0.6%  mediator
+  weather_normalized_source_eui_kbtu_sq_ft              0.4%  derived_circular
+  primary_property_type                                 0.3%  upstream
+  year_built                                            0.2%  upstream
+  longitude                                             0.2%  spatial
+
+======================================================================
+STEP 6 -- GENERATING FIGURES
+======================================================================
+    Saved -> D:\projects\1stArxivPaper\diagnostic\figures\fig_shap_beeswarm.png
+    Saved -> D:\projects\1stArxivPaper\diagnostic\figures\fig_shap_bar.png
+    Saved -> D:\projects\1stArxivPaper\diagnostic\figures\fig_shap_group.png
+    Saved -> D:\projects\1stArxivPaper\diagnostic\figures\fig_shap_combined.png
+
+======================================================================
+DIAGNOSTIC SUMMARY
+======================================================================
+  Train R²(log)                    : 0.9991
+  Train MdAPE                      : 1.64%
+  Top feature                      : electricity_use_kbtu (42.3%)
+  Derived/circular group share     : 15.0%
+  Mediator group share             : 57.2%
+  Upstream causal group share      : 26.1%
+
+  Interpretation
+  ────────────────────────────────────────────────────────────
+  M2's near-perfect CV metrics stem from derived features in
+  CB_ALL_FEATURES — particularly ghg_intensity_kg_co2e_sq_ft
+  (= total_GHG / floor_area). Including this as a predictor
+  of total_GHG is a near-tautology: the model recovers the
+  identity GHG ≈ ghg_intensity × floor_area without being
+  told to. The 15% SHAP share from derived/circular
+  features vs 26% from upstream causal features
+  confirms that M2's apparent performance does not reflect
+  genuine causal understanding of the GHG DGP.
+
+  Figures saved to: D:\projects\1stArxivPaper\diagnostic\figures
+======================================================================

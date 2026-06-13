@@ -1,0 +1,100 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\definecolor{linknavy}{RGB}{0, 70, 130}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=linknavy, citecolor=linknavy, urlcolor=linknavy, breaklinks=true,
+  pdftitle={Causal Inference for Compliance-Gated Administrative Data: A Tested Data-Generating Process Approach with Application to Municipal Energy Benchmarking},
+  pdfauthor={Chinh Mai}}
+\usepackage{enumitem}
+\usepackage{needspace}
+\usepackage{placeins}
+\usepackage{float}
+\usepackage{longtable}
+% Publication-quality figure captions: small text, 10 pt vertical skip.
+% \caption*{} (starred) suppresses the automatic "Figure X." prefix so the
+% manual "\textbf{Figure X.Y.} ..." embedded in each caption drives the label.
+% singlelinecheck=false prevents single-line captions from being centred.
+\usepackage[font=small,skip=10pt,justification=justified,
+            singlelinecheck=false]{caption}
+
+% Classic journal paragraph style: indented first lines, no inter-paragraph
+% gap. (The draft renders previously used parskip's block paragraphs.)
+\setlength{\parindent}{15pt}
+\setlength{\parskip}{0pt plus 1pt}
+
+% Keep paragraph-opening and -closing lines attached to their paragraph
+% across page breaks (no widows/orphans in a submission-ready manuscript).
+\widowpenalty=10000
+\clubpenalty=10000
+
+% Float placement: topfraction=0.72 means one wide figure + caption can sit
+% at the top of a page (most figures are 200--400 pt scaled) but two cannot
+% stack and cause overfull vboxes. floatpagefraction=0.65 is low enough that
+% medium-tall figures (shap_combined ~514 pt, type_intercepts ~491 pt) reach
+% a dedicated float page rather than being deferred to the document end.
+% A \FloatBarrier is emitted at each \section{} boundary (not subsections) so
+% figures stay inside their own section without creating mid-section gaps.
+\renewcommand{\topfraction}{0.72}
+\renewcommand{\bottomfraction}{0.60}
+\renewcommand{\textfraction}{0.12}
+\renewcommand{\floatpagefraction}{0.65}
+\setcounter{topnumber}{2}
+\setcounter{bottomnumber}{1}
+\setcounter{totalnumber}{3}
+
+% Top-align dedicated float pages: pack figures from the top and let any
+% leftover space collect at the bottom, instead of spreading gaps between them.
+\makeatletter
+\setlength{\@fptop}{0pt}
+\setlength{\@fpsep}{14pt plus 0fil}
+\setlength{\@fpbot}{0pt plus 1fil}
+\makeatother
+
+\definecolor{citecolor}{RGB}{0, 90, 156}
+\newcommand{\cit}[2]{\hyperlink{#1}{\textcolor{citecolor}{#2}}}
+
+% Inline code: monospace with light gray background, mimicking Markdown rendering.
+\newcommand{\code}[1]{{\setlength{\fboxsep}{2pt}\colorbox{gray!12}{\strut\texttt{#1}}}}
+
+\newtheorem{definition}{Definition}[section]
+\newtheorem{proposition}{Proposition}[section]
+
+\title{Causal Inference for Compliance-Gated Administrative Data:\\
+A Tested Data-Generating Process Approach with Application to Municipal Energy Benchmarking}
+\author{Chinh Mai\\[2pt]
+{\small\texttt{chinhmai.work@gmail.com}}}
+\date{June 2026}
+
+\begin{document}
+\maketitle
+
+% Loose typesetting for draft renders -- allow longer inter-word spaces to
+% avoid overfull boxes on long math expressions and URLs.
+\sloppy
+
+\input{sections/00_abstract}
+\input{sections/01_introduction}
+\input{sections/02_section}
+\input{sections/03_section}
+\input{sections/04_section}
+\input{sections/05_section}
+\input{sections/06_section}
+\input{sections/07_section}
+\input{sections/08_section}
+
+\clearpage
+\section*{References}
+\input{sections/references}
+
+\end{document}
