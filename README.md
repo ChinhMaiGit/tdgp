@@ -19,9 +19,9 @@ produced them (`scripts/`), human-readable result/description summaries
 cross-validation numbers and LaTeX comparison table (`results/experiments/`).
 
 ```
-tex/                  self-contained, arXiv-uploadable bundle
+tex/                  self-contained LaTeX source for the paper
   main.tex            entry point (\input sections/*.tex)
-  main.pdf            compiled draft (rebuilt by arXiv from source; not uploaded)
+  main.pdf            compiled draft (the published artifact)
   sections/           00_abstract.tex, 01_introduction.tex,
                       02_section.tex … 08_section.tex, references.tex
   figures/            24 figures (PNG) referenced by the draft (flat, by basename)
