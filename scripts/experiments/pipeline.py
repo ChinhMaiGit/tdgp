@@ -98,6 +98,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import optuna
+from pathlib import Path
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, LabelEncoder
 from sklearn.model_selection import GroupKFold, KFold
@@ -109,6 +110,11 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 # ── Constants ────────────────────────────────────────────────────────────────
 APP_TOKEN = "UDkg4uZFQ2yaBoY2bVn8zMmKj"
 SEED      = 20
+
+# Frozen local data snapshot (the exact vintage used in the paper). When
+# present it is used instead of the live Socrata API so results reproduce
+# exactly; the API is only a fallback. See data/SNAPSHOT.txt for provenance.
+DATA_SNAPSHOT = Path(__file__).resolve().parents[2] / "data" / "data_full.parquet"
 TARGET    = "total_ghg_emissions_metric_tons_co2e"
 BID_COL   = "id"
 
@@ -228,8 +234,33 @@ LEGEND_LABELS = {
 # 1. DATA LOADING
 # ===========================================================================
 
+def _coerce_schema(raw: pl.DataFrame) -> pl.DataFrame:
+    """Type the raw frame to DICT_META, dropping ``location``.
+
+    Columns absent from ``raw`` (the Socrata JSON omits fields that are null
+    for every record, and the published dataset's columns drift over time) are
+    materialised as all-null columns of the declared dtype so downstream code
+    sees a stable schema regardless of the source vintage.
+    """
+    keep = [c for c in DICT_META if c != "location"]
+    return raw.select([
+        pl.col(c).cast(DICT_META[c], strict=False) if c in raw.columns
+        else pl.lit(None, dtype=DICT_META[c]).alias(c)
+        for c in keep
+    ])
+
+
 def fetch_data(app_token: str) -> pl.DataFrame:
-    """Paginate the Socrata REST API and return a typed Polars DataFrame."""
+    """Return the typed dataset, preferring the frozen local snapshot.
+
+    If ``DATA_SNAPSHOT`` exists it is loaded; otherwise the Socrata REST API is
+    paginated as a fallback. Both paths are reduced to the same schema by
+    ``_coerce_schema``.
+    """
+    if DATA_SNAPSHOT.exists():
+        print(f"Loading frozen data snapshot: {DATA_SNAPSHOT}")
+        return _coerce_schema(pl.read_parquet(DATA_SNAPSHOT))
+
     base   = "https://data.cityofchicago.org/resource/xq83-jr8c.json"
     chunks, offset, limit = [], 0, 50_000
     print("Fetching Chicago Energy Benchmarking data ...")
@@ -253,12 +284,7 @@ def fetch_data(app_token: str) -> pl.DataFrame:
 
     df_pd = pd.concat(chunks, ignore_index=True)
     print(f"  Total records: {len(df_pd):,}\n")
-    return (
-        pl.from_pandas(df_pd)
-        .select(DICT_META.keys())
-        .with_columns([pl.col(c).cast(t) for c, t in DICT_META.items()])
-        .drop("location")
-    )
+    return _coerce_schema(pl.from_pandas(df_pd))
 
 
 # ===========================================================================

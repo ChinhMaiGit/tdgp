@@ -31,6 +31,10 @@ models, M1–M6.
 ├── uv.lock                   fully pinned dependency lock
 ├── .python-version           interpreter version (3.14)
 │
+├── data/                     frozen input data
+│   ├── data_full.parquet     exact dataset vintage used in the paper
+│   └── SNAPSHOT.txt          provenance, checksum, source-drift note
+│
 ├── tex/                      paper source and compiled output
 │   ├── main.tex              entry point (\input sections/*.tex)
 │   ├── main.pdf              compiled draft (the published artifact)
@@ -60,8 +64,9 @@ write into them, so they are not stored in the repository when empty.
 ## Requirements
 
 - **Python 3.14** (recorded in `.python-version`).
-- A **live internet connection** — the scripts fetch the raw data at runtime
-  from the City of Chicago Socrata API; there is no local data file.
+- **No internet connection required.** The exact input data is frozen in
+  `data/data_full.parquet` and loaded automatically; the City of Chicago
+  Socrata API is used only as a fallback when that file is absent.
 
 The exact dependency set is pinned in `pyproject.toml` and `uv.lock`. Reproduce
 the environment with [uv](https://docs.astral.sh/uv/):
@@ -113,9 +118,22 @@ regenerated into `results/inference/` as a side effect of running
 ## Data
 
 The analysis uses the [Chicago Energy Benchmarking](https://data.cityofchicago.org/resource/xq83-jr8c.json)
-dataset (28,329 building-year records, 2014–2023), fetched at runtime from the
-City of Chicago Socrata API. It is published by the City of Chicago under its
-own terms and is not redistributed here.
+dataset (28,329 building-year records, 2014–2023), published by the City of
+Chicago Data Portal (dataset `xq83-jr8c`).
+
+The **exact vintage used in the paper is frozen** in `data/data_full.parquet`
+and loaded automatically by the scripts, so results reproduce deterministically.
+Its provenance and SHA-256 checksum are recorded in
+[`data/SNAPSHOT.txt`](data/SNAPSHOT.txt).
+
+> **Source drift.** The live API no longer returns two columns the paper uses
+> (`all_other_fuel_use_kbtu`, `weather_normalized_source_eui_kbtu_sq_ft`), so a
+> fresh fetch does *not* reproduce the paper. The frozen snapshot is therefore
+> the authoritative input; the API path remains only as a fallback.
+
+The dataset is published under the City of Chicago's open-data terms and is
+redistributed here unmodified for reproducibility; it is **not** covered by this
+repository's CC BY-NC 4.0 license.
 
 ---
 

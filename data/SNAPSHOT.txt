@@ -1,0 +1,32 @@
+Chicago Energy Benchmarking -- frozen data snapshot
+===================================================
+
+File        : data_full.parquet
+Source      : https://data.cityofchicago.org/resource/xq83-jr8c.json
+Publisher   : City of Chicago Data Portal (dataset xq83-jr8c)
+Rows        : 28,329  (building-year records, 2014-2023)
+Columns     : 29      (the published 30-column schema minus "location")
+SHA-256     : 7938aeb6098c34fe559bb9aabda9a3ae579842ac545397b435358841e9da6d91
+
+This is the exact data vintage used to produce the paper. It is verified
+against the frozen experiment checkpoint: the per-column medians over the
+21,714 observed-target rows match results/experiments/results.pkl
+(e.g. all_other_fuel_use_kbtu = 68,993.1,
+weather_normalized_source_eui_kbtu_sq_ft = 140.5). The analysis scripts load
+this file via DATA_SNAPSHOT instead of calling the live API, so every figure
+and table reproduces deterministically.
+
+Important -- source drift
+-------------------------
+The live Socrata API no longer returns two columns that the paper uses,
+all_other_fuel_use_kbtu and weather_normalized_source_eui_kbtu_sq_ft (they
+are now null for every record, and Socrata omits all-null fields). A fresh
+API fetch therefore does NOT reproduce the paper. This frozen snapshot is the
+authoritative input; the API path in the scripts remains only as a fallback
+and reflects the degraded current vintage.
+
+License
+-------
+This file is published by the City of Chicago under its own terms of use
+(open data); it is redistributed here unmodified for reproducibility and is
+NOT covered by the repository's CC BY-NC 4.0 license.

@@ -48,6 +48,11 @@ plt.rcParams.update({
 FIGURES_DIR = Path(__file__).resolve().parents[2] / "results" / "data"
 FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
+# Frozen local data snapshot (the exact vintage used in the paper). When
+# present it is used instead of the live Socrata API so results reproduce
+# exactly; the API is only a fallback. See data/SNAPSHOT.txt for provenance.
+DATA_SNAPSHOT = Path(__file__).resolve().parents[2] / "data" / "data_full.parquet"
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -144,6 +149,10 @@ ROLE_COLORS: dict = {
 # ---------------------------------------------------------------------------
 
 def fetch_dataset() -> pl.DataFrame:
+    if DATA_SNAPSHOT.exists():
+        print(f"Loading frozen data snapshot: {DATA_SNAPSHOT}")
+        return pl.read_parquet(DATA_SNAPSHOT)
+
     print("Fetching Chicago Energy Benchmarking data from Socrata API...")
     print("  Endpoint : " + API_ENDPOINT)
 

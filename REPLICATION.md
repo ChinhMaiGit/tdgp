@@ -17,10 +17,12 @@ and sensitivity material.
 ### Environment
 
 - **Python 3.14** (the committed bytecode is `cpython-314`).
-- A **live internet connection** — every analysis script pulls the raw data at
-  runtime from the City of Chicago Socrata API
-  (`https://data.cityofchicago.org/resource/xq83-jr8c.json`). There is no local
-  data file in the repo; nothing is cached between runs.
+- **No internet connection required.** The exact input data is frozen in
+  `data/data_full.parquet` and loaded automatically. The City of Chicago
+  Socrata API (`https://data.cityofchicago.org/resource/xq83-jr8c.json`) is
+  used only as a fallback when that file is absent — and note that the live
+  API has since dropped two columns the paper uses, so a fresh fetch no longer
+  reproduces the paper (see `data/SNAPSHOT.txt`).
 
 ### Packages
 
@@ -63,14 +65,14 @@ published numbers — do not change them to replicate:
 
 ## 3. Run order
 
-There are three tiers. **Tier A** scripts are fully standalone (data + network
-only). **Tier B** is the main experiment and must run before Tier C. **Tier C**
-scripts consume artifacts produced by Tier B (`results.pkl` and/or the MCMC
-traces).
+All scripts read the frozen `data/data_full.parquet` snapshot, so none requires
+network access. There are three tiers: **Tier A** scripts are standalone,
+**Tier B** is the main experiment and must run before **Tier C**, which consumes
+artifacts produced by Tier B (`results.pkl` and/or the MCMC traces).
 
 ### Tier A — standalone descriptive / structural outputs
 
-Run in any order; each re-fetches the data independently.
+Run in any order; each loads the data snapshot independently.
 
 ```bash
 # EDA: 6 figures -> results/data/  + text report to stdout
@@ -121,9 +123,9 @@ python scripts/experiments/reporting.py
 
 ### Tier C — inference, diagnostics, counterfactuals, sensitivity
 
-These load the Tier B traces (`m3_trace.nc` / `m6_trace.nc`) and/or re-fetch the
-data; run them only after Tier B has produced the traces. Order among them does
-not matter.
+These load the Tier B traces (`m3_trace.nc` / `m6_trace.nc`) and/or the data
+snapshot; run them only after Tier B has produced the traces. Order among them
+does not matter.
 
 ```bash
 # Posterior diagnostics & posterior-predictive checks
@@ -136,13 +138,13 @@ python scripts/counterfactual/counterfactual.py   # -> results/counterfactual/
 # Prior/spec sensitivity sweep around the M6 specification
 python scripts/sensitivity/sensitivity.py    # -> results/sensitivity/
 
-# M2 SHAP attribution (refits M2 on full CB data; needs `shap`; network)
+# M2 SHAP attribution (refits M2 on full CB data; needs `shap`)
 python scripts/diagnostic/m2_shap.py         # -> results/diagnostic/
 ```
 
-> `m2_shap.py` does **not** depend on Tier B — it re-fetches the data and refits
-> M2 on the full causally-blind set for SHAP stability. It is grouped here only
-> because it is a diagnostic; it can equally run in Tier A.
+> `m2_shap.py` does **not** depend on Tier B — it reloads the data snapshot and
+> refits M2 on the full causally-blind set for SHAP stability. It is grouped here
+> only because it is a diagnostic; it can equally run in Tier A.
 
 ---
 
@@ -197,10 +199,12 @@ the headline six-model comparison table is `results/experiments/table_comparison
 ## 6. Notes & gotchas
 
 - **Reproducibility of the numbers** depends on the fixed `SEED = 20` and on the
-  data being unchanged upstream. The Socrata dataset is a live municipal feed; a
-  later snapshot can shift row counts (the paper cites ~21,714 CB / ~21,406
-  causal rows) and therefore the third-decimal metrics. Pin against those row
-  counts to confirm you fetched a comparable vintage.
+  frozen `data/data_full.parquet` snapshot, which is the exact vintage used in
+  the paper (~21,714 CB / ~21,406 causal rows; verified against
+  `results/experiments/results.pkl`). Do **not** delete the snapshot to force a
+  live fetch: the Socrata feed has since dropped two columns the paper uses, so a
+  fresh fetch silently changes the inputs (the scripts back-fill the missing
+  columns as null) and the metrics will differ. See `data/SNAPSHOT.txt`.
 - **Three scripts referenced in the old README are not present** in this working
   tree (`generate_figure_2b3d.py`, `render_draft.py`, `xgb_standard_pipeline.py`
   were deleted). The experiment figures/table they would have produced are
