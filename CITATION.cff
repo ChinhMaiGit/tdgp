@@ -28,3 +28,18 @@ doi: "10.5281/zenodo.20686630"
 type: software
 version: "1.0.0"
 date-released: "2026-06-14"
+# The top-level entry above describes this code & data archive.
+# To cite the paper itself, use the preferred citation below.
+preferred-citation:
+  type: article
+  title: >-
+    Causal Inference for Compliance-Gated Administrative Data: A Tested
+    Data-Generating Process Approach with Application to Municipal Energy
+    Benchmarking
+  authors:
+    - family-names: Mai
+      given-names: Xuân Chính
+      orcid: "https://orcid.org/0009-0000-7102-9546"
+  year: 2026
+  doi: "10.5281/zenodo.20686698"
+  url: "https://doi.org/10.5281/zenodo.20686698"

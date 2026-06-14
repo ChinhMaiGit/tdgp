@@ -4,7 +4,8 @@
 
 Xuân Chính Mai · [ORCID 0009-0000-7102-9546](https://orcid.org/0009-0000-7102-9546)
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20686630.svg)](https://doi.org/10.5281/zenodo.20686630)
+Paper: [![Paper DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20686698.svg)](https://doi.org/10.5281/zenodo.20686698)
+Code & data archive: [![Archive DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20686630.svg)](https://doi.org/10.5281/zenodo.20686630)
 
 This repository is the reproducibility bundle for the paper above. It contains
 the LaTeX source and compiled PDF, the analysis code that produces every figure
@@ -150,7 +151,12 @@ purposes**. The underlying dataset is covered by the City of Chicago's terms.
 
 ## Citation
 
-This repository is archived on Zenodo with DOI
-[10.5281/zenodo.20686630](https://doi.org/10.5281/zenodo.20686630).
-Structured citation metadata is in [`CITATION.cff`](CITATION.cff); please cite
-the DOI for the version you used.
+Two linked Zenodo records:
+
+- **Paper (preprint):** [10.5281/zenodo.20686698](https://doi.org/10.5281/zenodo.20686698)
+  — cite this for the work itself.
+- **Code & data archive:** [10.5281/zenodo.20686630](https://doi.org/10.5281/zenodo.20686630)
+  — cite this when referring specifically to the software/data.
+
+Structured citation metadata is in [`CITATION.cff`](CITATION.cff); its
+`preferred-citation` resolves to the paper.
