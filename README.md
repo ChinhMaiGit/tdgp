@@ -2,7 +2,7 @@
 
 **A Tested Data-Generating Process Approach with Application to Municipal Energy Benchmarking**
 
-Xuan Chinh Mai · [ORCID 0009-0000-7102-9546](https://orcid.org/0009-0000-7102-9546)
+Xuân Chính Mai · [ORCID 0009-0000-7102-9546](https://orcid.org/0009-0000-7102-9546)
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20686630.svg)](https://doi.org/10.5281/zenodo.20686630)
 
