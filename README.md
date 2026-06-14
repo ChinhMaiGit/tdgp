@@ -4,6 +4,8 @@
 
 Xuan Chinh Mai · [ORCID 0009-0000-7102-9546](https://orcid.org/0009-0000-7102-9546)
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20686630.svg)](https://doi.org/10.5281/zenodo.20686630)
+
 This repository is the reproducibility bundle for the paper above. It contains
 the LaTeX source and compiled PDF, the analysis code that produces every figure
 and table, and the result summaries that back the reported numbers.
@@ -148,6 +150,7 @@ purposes**. The underlying dataset is covered by the City of Chicago's terms.
 
 ## Citation
 
-Citation metadata is in [`CITATION.cff`](CITATION.cff). This repository is
-archived on Zenodo; please cite the Zenodo DOI for the specific version you used
-(the DOI will be added to `CITATION.cff` once the deposit is minted).
+This repository is archived on Zenodo with DOI
+[10.5281/zenodo.20686630](https://doi.org/10.5281/zenodo.20686630).
+Structured citation metadata is in [`CITATION.cff`](CITATION.cff); please cite
+the DOI for the version you used.
