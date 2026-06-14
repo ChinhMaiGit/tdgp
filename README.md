@@ -4,7 +4,7 @@ Snapshot date: 2026-06-13.
 
 Paper: *Causal Inference for Compliance-Gated Administrative Data: A Tested
 Data-Generating Process Approach with Application to Municipal Energy
-Benchmarking* (Chinh Mai).
+Benchmarking* (Xuan Chinh Mai).
 
 The paper compares causally-blind vs causally-informed modelling pipelines
 across a 2x3 factorial experiment (2 pipelines x 3 model types = 6 models:
