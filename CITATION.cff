@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+title: >-
+  Causal Inference for Compliance-Gated Administrative Data: A Tested
+  Data-Generating Process Approach with Application to Municipal Energy
+  Benchmarking
+authors:
+  - family-names: Mai
+    given-names: Xuan Chinh
+    orcid: "https://orcid.org/0009-0000-7102-9546"
+abstract: >-
+  A three-stage Tested Data-Generating Process (TDGP) pipeline that locates a
+  compliance gate in a dataset's missingness structure, formulates a candidate
+  causal graph from that structure and variable descriptions alone, and tests
+  it against the institutional documents that define the reporting obligation.
+  Demonstrated on the Chicago Energy Benchmarking dataset via a 2x3 factorial
+  experiment crossing causal correction with functional form.
+keywords:
+  - causal inference
+  - directed acyclic graphs
+  - selection bias
+  - missing data
+  - inverse probability weighting
+  - energy benchmarking
+license: CC-BY-NC-4.0
+repository-code: "https://github.com/ChinhMaiGit/tdgp"
+type: software
+version: "1.0.0"
+date-released: "2026-06-14"
+# After the Zenodo deposit mints a DOI, add it here, e.g.:
+# doi: "10.5281/zenodo.XXXXXXX"

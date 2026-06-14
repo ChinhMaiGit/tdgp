@@ -1,0 +1,24 @@
+[project]
+name = "tdgp"
+version = "1.0.0"
+description = "Tested Data-Generating Process pipeline and analysis code for the Chicago Energy Benchmarking causal-inference paper"
+readme = "README.md"
+license = "CC-BY-NC-4.0"
+requires-python = ">=3.13"
+dependencies = [
+    "arviz>=1.1.0",
+    "h5netcdf>=1.8.1",
+    "h5py>=3.16.0",
+    "matplotlib>=3.10.9",
+    "numpy>=2.4.6",
+    "optuna>=4.8.0",
+    "pandas>=3.0.3",
+    "polars>=1.40.1",
+    "pyarrow>=24.0.0",
+    "pymc>=5.26.1",
+    "requests>=2.34.2",
+    "scikit-learn>=1.8.0",
+    "scipy>=1.16.0",
+    "shap>=0.51.0",
+    "xgboost>=3.2.0",
+]

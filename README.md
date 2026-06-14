@@ -62,20 +62,30 @@ results/                script outputs are routed here, grouped by source
   are produced by `experiments/experiment.py` (and regenerated standalone from
   `results.pkl` by `experiments/reporting.py`); the LaTeX/PDF render that
   `render_draft.py` used to produce is already frozen under `tex/`.
-- **Dependency specification.** No `pyproject.toml` or `uv.lock` is included.
-  Required packages: `numpy`, `scipy`, `pandas`, `polars`, `matplotlib`,
-  `requests`, `xgboost`, `optuna`, `scikit-learn`, `shap`, `pymc`, `arviz`
-  (tested on Python 3.14).
+## Environment
 
-## Posting to arXiv
+The exact dependency set is pinned in `pyproject.toml` and `uv.lock`, with the
+interpreter recorded in `.python-version` (Python 3.14). To reproduce the
+environment with [uv](https://docs.astral.sh/uv/):
 
-The `tex/` directory is a self-contained submission bundle. Upload its contents
-(`main.tex`, `sections/`, and `figures/`); arXiv recompiles from source, so the
-`\includegraphics{figures/...}` paths resolve relative to `main.tex` with no
-`../` escaping the upload root. References are typeset from `sections/references.tex`
-via `\input` (no BibTeX), so no `.bbl` is required. Do not include `main.pdf` in
-the upload — arXiv builds its own. Note that a first submission to `stat.ME` or
-`econ.EM` may require endorsement, and a license must be chosen at submission.
+```
+uv sync
+```
+
+Core packages: `numpy`, `scipy`, `pandas`, `polars`, `matplotlib`, `requests`,
+`xgboost`, `optuna`, `scikit-learn`, `shap`, `pymc`, `arviz`.
+
+## License and citation
+
+This work is released under the **Creative Commons Attribution-NonCommercial
+4.0 International (CC BY-NC 4.0)** license — see [`LICENSE`](LICENSE). You may
+share and adapt the paper and code with attribution, but **not for commercial
+purposes**. The underlying Chicago Energy Benchmarking dataset is published
+separately by the City of Chicago under its own terms.
+
+Citation metadata is in [`CITATION.cff`](CITATION.cff). The paper and this
+repository are archived on Zenodo; cite the Zenodo DOI for the specific version
+you used (the DOI will be added to `CITATION.cff` once the deposit is minted).
 
 ## Regenerating results
 
